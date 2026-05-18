@@ -1,0 +1,16 @@
+# --- Framework Web ---
+fastapi
+uvicorn[standard]
+
+# --- Configuration & Variables d'environnement ---
+pydantic-settings
+python-dotenv
+
+# --- IA & Appels Réseau ---
+huggingface_hub
+requests
+openai
+
+# --- Tests ---
+pytest
+pytest-asyncio
