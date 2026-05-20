@@ -1,0 +1,28 @@
+# Secrets — ne jamais copier dans l'image Docker
+.env
+.env.*
+!.env.example
+
+# Environnements virtuels
+envRequirement/
+.venv/
+venv/
+env/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Tests
+tests/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/

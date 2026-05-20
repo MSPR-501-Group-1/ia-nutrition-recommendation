@@ -6,10 +6,17 @@ uvicorn[standard]
 pydantic-settings
 python-dotenv
 
+# --- PostgreSQL async ---
+sqlalchemy[asyncio]
+asyncpg
+
+# --- MongoDB async ---
+motor
+
 # --- IA & Appels Réseau ---
-huggingface_hub
-requests
 openai
+httpx
+aiofiles
 
 # --- Tests ---
 pytest

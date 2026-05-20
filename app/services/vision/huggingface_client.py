@@ -48,7 +48,6 @@ async def detect_food_with_hf(image_bytes: bytes) -> list:
         from app.core.config import settings
 
     api_key = settings.huggingface_api_key
-    print(f"--- DEBUG --- Clé HF (début) : {api_key[:8]}... | Modèle : {_MODEL_ID}")
 
     # Encode l'image en data URL base64 (format attendu par l'API vision)
     b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -72,7 +71,6 @@ async def detect_food_with_hf(image_bytes: bytes) -> list:
         )
 
         raw_text = completion.choices[0].message.content.strip()
-        print(f"✅ Réponse brute du modèle : {raw_text[:200]}")
 
         # Retire d'éventuels blocs markdown ```json ... ``` si le modèle en produit
         if raw_text.startswith("```"):
@@ -85,10 +83,7 @@ async def detect_food_with_hf(image_bytes: bytes) -> list:
         if not isinstance(result, list):
             raise ValueError(f"Réponse inattendue (pas une liste) : {result}")
 
-        print(f"✅ {len(result)} aliment(s) identifié(s)")
         return result
 
     except Exception as e:
-        print(f"❌ ERREUR KIMI-K2.5 : {e}")
-        print("⚠️  PASSAGE EN MODE SECOURS (MOCK)")
         return MOCK_RESPONSE
