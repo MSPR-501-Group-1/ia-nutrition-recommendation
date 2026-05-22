@@ -1,14 +1,29 @@
 ﻿# app/api/health.py
 # Route de health check : vérifie l'état des connexions DB et MongoDB.
 
+from typing import Literal
+
 from fastapi import APIRouter
+from pydantic import BaseModel
+
 from app.db.database import ping_db
 from app.db.mongo import ping_mongo
 
 router = APIRouter()
 
 
-@router.get("/health", tags=["System"])
+class _ServiceStatus(BaseModel):
+    api:        Literal["ok"]
+    postgresql: Literal["ok", "unreachable"]
+    mongodb:    Literal["ok", "unreachable"]
+
+
+class HealthResponse(BaseModel):
+    status:   Literal["ok", "degraded"]
+    services: _ServiceStatus
+
+
+@router.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check():
     """
     Retourne l'état de l'API et de ses dépendances (PostgreSQL, MongoDB).

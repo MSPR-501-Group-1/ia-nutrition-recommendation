@@ -1,0 +1,513 @@
+{
+  "status": "success",
+  "request_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "generated_at": "2026-05-22T08:00:00Z",
+  "ai_model": "mistral:7b",
+  "confidence_score": 0.89,
+
+  "user_context": {
+    "user_id": "usr_mock_001",
+    "first_name": "Sophie",
+    "goal": "fat_loss",
+    "diet_type": "NONE",
+    "allergies": ["GLUTEN"],
+    "height_cm": 167.0,
+    "weight_kg": 68.5
+  },
+
+  "plan_metadata": {
+    "duration_days": 7,
+    "target_calories_daily": 1750,
+    "target_macros": {
+      "protein_g": 140,
+      "carbs_g": 160,
+      "fat_g": 55
+    },
+    "budget_constraint_eur": 60.00,
+    "estimated_weekly_cost_eur": 57.40,
+    "diet_type": "NONE",
+    "excluded_allergens": ["GLUTEN"]
+  },
+
+  "daily_plans": [
+    {
+      "day_number": 1,
+      "date": "2026-05-22",
+      "total_calories": 1748,
+      "total_macros": {
+        "protein_g": 138,
+        "carbs_g": 158,
+        "fat_g": 54
+      },
+      "estimated_cost_eur": 8.20,
+      "meals": [
+        {
+          "meal_type": "breakfast",
+          "time_suggested": "07:30",
+          "recipe": {
+            "recipe_id": "rec_001_breakfast",
+            "title": "Bol protéiné yaourt grec & fruits rouges",
+            "instructions": "1. Verser le yaourt grec dans un bol. 2. Ajouter les myrtilles et les framboises. 3. Saupoudrer de graines de chia. 4. Arroser d'un filet de miel.",
+            "prep_time_min": 5,
+            "cook_time_min": 0,
+            "servings": 1,
+            "image_url": null,
+            "nutriscore": "A",
+            "tags": ["high-protein", "gluten-free", "quick", "no-cook"],
+            "ingredients": [
+              {
+                "ingredient_id": "ing_yaourt_grec",
+                "name": "Yaourt grec nature (0%)",
+                "category": "DAIRY",
+                "nutriscore": "A",
+                "quantity_g": 200,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 118,
+                  "protein_g": 20.0,
+                  "carbs_g": 8.0,
+                  "fat_g": 0.4,
+                  "fiber_g": 0.0,
+                  "sugar_g": 6.0,
+                  "sodium_mg": 60.0
+                },
+                "estimated_cost_eur": 0.55
+              },
+              {
+                "ingredient_id": "ing_myrtille",
+                "name": "Myrtilles fraîches",
+                "category": "FRUIT",
+                "nutriscore": "A",
+                "quantity_g": 80,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 46,
+                  "protein_g": 0.6,
+                  "carbs_g": 11.4,
+                  "fat_g": 0.3,
+                  "fiber_g": 2.2,
+                  "sugar_g": 8.0,
+                  "sodium_mg": 1.0
+                },
+                "estimated_cost_eur": 0.90
+              },
+              {
+                "ingredient_id": "ing_chia",
+                "name": "Graines de chia",
+                "category": "OTHER",
+                "nutriscore": "B",
+                "quantity_g": 15,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 72,
+                  "protein_g": 2.4,
+                  "carbs_g": 4.2,
+                  "fat_g": 4.6,
+                  "fiber_g": 5.2,
+                  "sugar_g": 0.0,
+                  "sodium_mg": 3.0
+                },
+                "estimated_cost_eur": 0.20
+              }
+            ],
+            "nutritional_summary": {
+              "calories": 236,
+              "protein_g": 23.0,
+              "carbs_g": 23.6,
+              "fat_g": 5.3,
+              "fiber_g": 7.4
+            },
+            "estimated_cost_eur": 1.65,
+            "ai_notes": [
+              "Riche en protéines pour préserver la masse musculaire en déficit calorique.",
+              "Les graines de chia apportent des oméga-3 et ralentissent la digestion."
+            ]
+          }
+        },
+        {
+          "meal_type": "lunch",
+          "time_suggested": "12:30",
+          "recipe": {
+            "recipe_id": "rec_002_lunch",
+            "title": "Poulet rôti, riz basmati & haricots verts vapeur",
+            "instructions": "1. Préchauffer le four à 200°C. 2. Assaisonner le blanc de poulet avec herbes de Provence, sel, poivre et un filet d'huile d'olive. 3. Enfourner 20 min. 4. Cuire le riz basmati (rincer, 2x volume d'eau, 12 min). 5. Faire cuire les haricots verts 8 min à la vapeur. 6. Dresser dans une assiette.",
+            "prep_time_min": 10,
+            "cook_time_min": 22,
+            "servings": 1,
+            "image_url": null,
+            "nutriscore": "A",
+            "tags": ["high-protein", "gluten-free", "balanced", "meal-prep-friendly"],
+            "ingredients": [
+              {
+                "ingredient_id": "ing_poulet_blanc",
+                "name": "Blanc de poulet",
+                "category": "MEAT",
+                "nutriscore": "A",
+                "quantity_g": 180,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 198,
+                  "protein_g": 43.2,
+                  "carbs_g": 0.0,
+                  "fat_g": 2.5,
+                  "fiber_g": 0.0,
+                  "sugar_g": 0.0,
+                  "sodium_mg": 90.0
+                },
+                "estimated_cost_eur": 2.10
+              },
+              {
+                "ingredient_id": "ing_riz_basmati",
+                "name": "Riz basmati (cru)",
+                "category": "GRAIN",
+                "nutriscore": "B",
+                "quantity_g": 70,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 252,
+                  "protein_g": 5.0,
+                  "carbs_g": 55.3,
+                  "fat_g": 0.5,
+                  "fiber_g": 0.9,
+                  "sugar_g": 0.1,
+                  "sodium_mg": 2.0
+                },
+                "estimated_cost_eur": 0.25
+              },
+              {
+                "ingredient_id": "ing_haricots_verts",
+                "name": "Haricots verts frais",
+                "category": "VEGETABLE",
+                "nutriscore": "A",
+                "quantity_g": 150,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 44,
+                  "protein_g": 2.4,
+                  "carbs_g": 7.7,
+                  "fat_g": 0.3,
+                  "fiber_g": 3.8,
+                  "sugar_g": 3.3,
+                  "sodium_mg": 6.0
+                },
+                "estimated_cost_eur": 0.60
+              },
+              {
+                "ingredient_id": "ing_huile_olive",
+                "name": "Huile d'olive extra vierge",
+                "category": "OTHER",
+                "nutriscore": "C",
+                "quantity_g": 10,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 90,
+                  "protein_g": 0.0,
+                  "carbs_g": 0.0,
+                  "fat_g": 10.0,
+                  "fiber_g": 0.0,
+                  "sugar_g": 0.0,
+                  "sodium_mg": 0.0
+                },
+                "estimated_cost_eur": 0.15
+              }
+            ],
+            "nutritional_summary": {
+              "calories": 584,
+              "protein_g": 50.6,
+              "carbs_g": 63.0,
+              "fat_g": 13.3,
+              "fiber_g": 4.7
+            },
+            "estimated_cost_eur": 3.10,
+            "ai_notes": [
+              "Repas complet et équilibré, idéal pour la perte de graisse sans catabolisme musculaire.",
+              "Le riz basmati a un index glycémique plus bas que le riz blanc classique."
+            ]
+          }
+        },
+        {
+          "meal_type": "snack",
+          "time_suggested": "16:00",
+          "recipe": {
+            "recipe_id": "rec_003_snack",
+            "title": "Pomme & amandes",
+            "instructions": "1. Laver et trancher la pomme. 2. Disposer les amandes dans un ramequin. Consommer immédiatement.",
+            "prep_time_min": 2,
+            "cook_time_min": 0,
+            "servings": 1,
+            "image_url": null,
+            "nutriscore": "A",
+            "tags": ["gluten-free", "no-cook", "quick", "snack"],
+            "ingredients": [
+              {
+                "ingredient_id": "ing_pomme",
+                "name": "Pomme Golden",
+                "category": "FRUIT",
+                "nutriscore": "A",
+                "quantity_g": 150,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 78,
+                  "protein_g": 0.4,
+                  "carbs_g": 20.3,
+                  "fat_g": 0.2,
+                  "fiber_g": 2.7,
+                  "sugar_g": 16.0,
+                  "sodium_mg": 1.0
+                },
+                "estimated_cost_eur": 0.35
+              },
+              {
+                "ingredient_id": "ing_amandes",
+                "name": "Amandes nature",
+                "category": "SNACK",
+                "nutriscore": "B",
+                "quantity_g": 25,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 145,
+                  "protein_g": 5.1,
+                  "carbs_g": 2.7,
+                  "fat_g": 12.5,
+                  "fiber_g": 3.0,
+                  "sugar_g": 0.7,
+                  "sodium_mg": 0.0
+                },
+                "estimated_cost_eur": 0.45
+              }
+            ],
+            "nutritional_summary": {
+              "calories": 223,
+              "protein_g": 5.5,
+              "carbs_g": 23.0,
+              "fat_g": 12.7,
+              "fiber_g": 5.7
+            },
+            "estimated_cost_eur": 0.80,
+            "ai_notes": [
+              "Les bons lipides des amandes favorisent la satiété jusqu'au dîner."
+            ]
+          }
+        },
+        {
+          "meal_type": "dinner",
+          "time_suggested": "19:30",
+          "recipe": {
+            "recipe_id": "rec_004_dinner",
+            "title": "Saumon vapeur, patate douce & épinards sautés",
+            "instructions": "1. Cuire le pavé de saumon à la vapeur 12 min avec citron et aneth. 2. Éplucher et cuire la patate douce en cubes (20 min eau bouillante). 3. Dans une poêle avec un peu d'huile d'olive, faire revenir l'ail écrasé 1 min, ajouter les épinards et sauter 3 min à feu vif. 4. Dresser, assaisonner.",
+            "prep_time_min": 10,
+            "cook_time_min": 20,
+            "servings": 1,
+            "image_url": null,
+            "nutriscore": "A",
+            "tags": ["high-protein", "gluten-free", "omega-3", "anti-inflammatory"],
+            "ingredients": [
+              {
+                "ingredient_id": "ing_saumon",
+                "name": "Pavé de saumon (Atlantique)",
+                "category": "MEAT",
+                "nutriscore": "A",
+                "quantity_g": 150,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 312,
+                  "protein_g": 31.5,
+                  "carbs_g": 0.0,
+                  "fat_g": 20.0,
+                  "fiber_g": 0.0,
+                  "sugar_g": 0.0,
+                  "sodium_mg": 85.0
+                },
+                "estimated_cost_eur": 2.80
+              },
+              {
+                "ingredient_id": "ing_patate_douce",
+                "name": "Patate douce",
+                "category": "VEGETABLE",
+                "nutriscore": "A",
+                "quantity_g": 120,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 103,
+                  "protein_g": 1.9,
+                  "carbs_g": 24.0,
+                  "fat_g": 0.1,
+                  "fiber_g": 3.8,
+                  "sugar_g": 7.4,
+                  "sodium_mg": 55.0
+                },
+                "estimated_cost_eur": 0.40
+              },
+              {
+                "ingredient_id": "ing_epinards",
+                "name": "Épinards frais",
+                "category": "VEGETABLE",
+                "nutriscore": "A",
+                "quantity_g": 100,
+                "unit": "g",
+                "macros_per_serving": {
+                  "calories": 23,
+                  "protein_g": 2.9,
+                  "carbs_g": 1.4,
+                  "fat_g": 0.4,
+                  "fiber_g": 2.2,
+                  "sugar_g": 0.4,
+                  "sodium_mg": 79.0
+                },
+                "estimated_cost_eur": 0.55
+              }
+            ],
+            "nutritional_summary": {
+              "calories": 438,
+              "protein_g": 36.3,
+              "carbs_g": 25.4,
+              "fat_g": 20.5,
+              "fiber_g": 6.0
+            },
+            "estimated_cost_eur": 3.75,
+            "ai_notes": [
+              "Le saumon couvre 100% de l'apport journalier recommandé en oméga-3.",
+              "La patate douce est préférée à la pomme de terre pour son index glycémique plus bas."
+            ]
+          }
+        }
+      ]
+    }
+  ],
+
+  "shopping_list": {
+    "total_estimated_cost_eur": 57.40,
+    "currency": "EUR",
+    "note": "Estimation pour 7 jours, 1 personne. Prix moyens grandes surfaces françaises.",
+    "grouped_by_category": [
+      {
+        "category": "MEAT",
+        "items": [
+          {
+            "ingredient_id": "ing_poulet_blanc",
+            "name": "Blanc de poulet",
+            "total_quantity_g": 1260,
+            "unit": "g",
+            "estimated_cost_eur": 14.70
+          },
+          {
+            "ingredient_id": "ing_saumon",
+            "name": "Pavé de saumon (Atlantique)",
+            "total_quantity_g": 450,
+            "unit": "g",
+            "estimated_cost_eur": 8.40
+          }
+        ]
+      },
+      {
+        "category": "VEGETABLE",
+        "items": [
+          {
+            "ingredient_id": "ing_haricots_verts",
+            "name": "Haricots verts frais",
+            "total_quantity_g": 1050,
+            "unit": "g",
+            "estimated_cost_eur": 4.20
+          },
+          {
+            "ingredient_id": "ing_patate_douce",
+            "name": "Patate douce",
+            "total_quantity_g": 840,
+            "unit": "g",
+            "estimated_cost_eur": 2.80
+          },
+          {
+            "ingredient_id": "ing_epinards",
+            "name": "Épinards frais",
+            "total_quantity_g": 700,
+            "unit": "g",
+            "estimated_cost_eur": 3.85
+          }
+        ]
+      },
+      {
+        "category": "DAIRY",
+        "items": [
+          {
+            "ingredient_id": "ing_yaourt_grec",
+            "name": "Yaourt grec nature (0%)",
+            "total_quantity_g": 1400,
+            "unit": "g",
+            "estimated_cost_eur": 3.85
+          }
+        ]
+      },
+      {
+        "category": "FRUIT",
+        "items": [
+          {
+            "ingredient_id": "ing_myrtille",
+            "name": "Myrtilles fraîches",
+            "total_quantity_g": 560,
+            "unit": "g",
+            "estimated_cost_eur": 6.30
+          },
+          {
+            "ingredient_id": "ing_pomme",
+            "name": "Pomme Golden",
+            "total_quantity_g": 1050,
+            "unit": "g",
+            "estimated_cost_eur": 2.45
+          }
+        ]
+      },
+      {
+        "category": "GRAIN",
+        "items": [
+          {
+            "ingredient_id": "ing_riz_basmati",
+            "name": "Riz basmati (cru)",
+            "total_quantity_g": 490,
+            "unit": "g",
+            "estimated_cost_eur": 1.75
+          }
+        ]
+      },
+      {
+        "category": "OTHER",
+        "items": [
+          {
+            "ingredient_id": "ing_chia",
+            "name": "Graines de chia",
+            "total_quantity_g": 105,
+            "unit": "g",
+            "estimated_cost_eur": 1.40
+          },
+          {
+            "ingredient_id": "ing_huile_olive",
+            "name": "Huile d'olive extra vierge",
+            "total_quantity_g": 70,
+            "unit": "g",
+            "estimated_cost_eur": 1.05
+          },
+          {
+            "ingredient_id": "ing_amandes",
+            "name": "Amandes nature",
+            "total_quantity_g": 175,
+            "unit": "g",
+            "estimated_cost_eur": 3.15
+          }
+        ]
+      }
+    ]
+  },
+
+  "nutritional_insights": {
+    "weekly_average_calories": 1748,
+    "weekly_average_macros": {
+      "protein_g": 138,
+      "carbs_g": 158,
+      "fat_g": 54
+    },
+    "balance_score": 0.91,
+    "detected_deficits": [],
+    "detected_excesses": [],
+    "ai_global_recommendation": "Votre plan est bien équilibré pour votre objectif de perte de graisse. L'apport protéique élevé (138g/j) permettra de préserver votre masse musculaire. Veillez à bien vous hydrater (1,5 à 2L d'eau par jour). Si vous ressentez de la fatigue en milieu de semaine, vous pouvez augmenter légèrement les glucides du déjeuner."
+  }
+}
