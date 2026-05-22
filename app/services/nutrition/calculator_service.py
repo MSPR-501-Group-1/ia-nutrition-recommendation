@@ -155,3 +155,84 @@ def calculate_meal_balance(meal_totals: dict, daily_needs: dict) -> dict:
         "carbs_status":     _status(carbs_pct),
         "fat_status":       _status(fat_pct),
     }
+
+
+# ─────────────────────────────────────────────
+# PIPELINE D'ANALYSE DE REPAS (utilisé par generate.py)
+# ─────────────────────────────────────────────
+
+#: Seuil de confiance appliqué aux labels HuggingFace
+CONFIDENCE_THRESHOLD = 0.40
+
+
+def compute_meal_needs(user: dict) -> dict:
+    """
+    Estime les besoins journaliers via Mifflin-St Jeor.
+    Utilisé dans le pipeline d'analyse de repas photographiés.
+
+    Attend les clés ``weight`` et ``height`` telles que retournées par
+    ``queries.get_user_profile`` (contrairement à ``calculate_daily_needs``
+    qui attend ``current_weight_kg`` / ``height_cm``).
+
+    Répartition des macros selon l'objectif :
+      fat_loss      → 35 % prot / 40 % carbs / 25 % lipides  (−300 kcal)
+      muscle_gain   → 30 % prot / 45 % carbs / 25 % lipides  (+200 kcal)
+      endurance     → 20 % prot / 55 % carbs / 25 % lipides
+      general       → 25 % prot / 50 % carbs / 25 % lipides
+    """
+    weight = float(user.get("weight") or 70)
+    height = float(user.get("height") or 170)
+    goal   = (user.get("goal_label") or "").lower()
+
+    bmr  = (10 * weight) + (6.25 * height) - (5 * 30) - 161  # Mifflin femme, 30 ans
+    tdee = round(bmr * 1.375)
+
+    if "fat_loss" in goal or "perte" in goal:
+        calories = max(1200, tdee - 300)
+        prot_pct, carb_pct, fat_pct = 0.35, 0.40, 0.25
+        method = "mifflin_fat_loss"
+    elif "muscle" in goal or "masse" in goal:
+        calories = tdee + 200
+        prot_pct, carb_pct, fat_pct = 0.30, 0.45, 0.25
+        method = "mifflin_muscle_gain"
+    elif "endurance" in goal:
+        calories = tdee
+        prot_pct, carb_pct, fat_pct = 0.20, 0.55, 0.25
+        method = "mifflin_endurance"
+    else:
+        method   = "mifflin_general" if user.get("weight") else "default_2000kcal"
+        calories = tdee if user.get("weight") else 2000
+        prot_pct, carb_pct, fat_pct = 0.25, 0.50, 0.25
+
+    return {
+        "calorie_target":   float(round(calories)),
+        "protein_target_g": float(round(calories * prot_pct / 4)),
+        "carbs_target_g":   float(round(calories * carb_pct / 4)),
+        "fat_target_g":     float(round(calories * fat_pct / 9)),
+        "method":           method,
+    }
+
+
+def compute_meal_balance(totals: dict, needs: dict) -> dict:
+    """
+    Calcule le % de la cible journalière couvert par ce repas.
+    Utilisé dans le pipeline d'analyse — retourne ``assessment`` attendu
+    par le modèle ``MealBalance``.
+
+      - "light"    : < 15 % des calories journalières
+      - "balanced" : 15–50 %
+      - "heavy"    : > 50 %
+    """
+    def _pct(val: float, target: float) -> float:
+        return round((val / target) * 100, 1) if target > 0 else 0.0
+
+    cal_pct    = _pct(totals["calories"],  needs["calorie_target"])
+    assessment = "light" if cal_pct < 15 else ("heavy" if cal_pct > 50 else "balanced")
+
+    return {
+        "calories_pct": cal_pct,
+        "protein_pct":  _pct(totals["protein_g"], needs["protein_target_g"]),
+        "carbs_pct":    _pct(totals["carbs_g"],   needs["carbs_target_g"]),
+        "fat_pct":      _pct(totals["fat_g"],     needs["fat_target_g"]),
+        "assessment":   assessment,
+    }

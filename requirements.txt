@@ -1,6 +1,7 @@
 # --- Framework Web ---
 fastapi
 uvicorn[standard]
+python-multipart
 
 # --- Configuration & Variables d'environnement ---
 pydantic-settings

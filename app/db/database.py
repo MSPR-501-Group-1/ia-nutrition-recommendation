@@ -1,8 +1,7 @@
 # app/db/database.py
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.config import settings
 
 # ─────────────────────────────────────────────
@@ -17,8 +16,8 @@ engine = create_async_engine(
 )
 
 # Fabrique de sessions async
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
+AsyncSessionLocal = async_sessionmaker(
+    engine,
     class_=AsyncSession,
     expire_on_commit=False,  # Les objets restent accessibles après commit
 )
