@@ -104,10 +104,10 @@ async def get_user_profile(db: AsyncSession, user_id: str) -> dict | None:
 
     metrics_result = await db.execute(
         text("""
-            SELECT weight_kg, body_fat_pourcentage, steps, calories_burned
+            SELECT weight_kg, body_fat_percentage, bmi, resting_bpm, health_goal, fitness_level
             FROM user_metrics
             WHERE user_id = :user_id
-            ORDER BY recorded_date DESC
+            ORDER BY recorded_at DESC
             LIMIT 1
         """),
         {"user_id": user_id},
