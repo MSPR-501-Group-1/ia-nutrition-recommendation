@@ -95,11 +95,38 @@ def calculate_daily_needs(user: dict) -> dict:
 # CALCUL DU BILAN D'UN REPAS
 # ─────────────────────────────────────────────
 
+def _atwater_calories(protein_g: float, carbs_g: float, fat_g: float) -> float:
+    """Formule d'Atwater : protéines×4 + glucides×4 + lipides×9 (kcal/100 g)."""
+    return protein_g * 4.0 + carbs_g * 4.0 + fat_g * 9.0
+
+
+def _reliable_calories(ingredient: dict) -> float:
+    """
+    Retourne les calories fiables pour 100 g.
+    Utilise calories_g de la DB si présente et dans un intervalle plausible
+    (10–900 kcal/100 g). Sinon recalcule via Atwater comme dernier recours.
+    Note : les données USDA de la seed ont souvent carbs_g=0 sur les produits
+    commerciaux, donc Atwater ne sert que de fallback pour les cas vraiment
+    absents, pas pour corriger des calories par ailleurs valides.
+    """
+    cal = float(ingredient.get("calories_g") or 0)
+    if 10 <= cal <= 900:
+        return cal
+    # Fallback Atwater uniquement si calories absentes ou hors plage
+    p = float(ingredient.get("protein_g") or 0)
+    c = float(ingredient.get("carbs_g")   or 0)
+    f = float(ingredient.get("fat_g")     or 0)
+    atwater = _atwater_calories(p, c, f)
+    return atwater if atwater > 0 else 50.0
+
+
 def calculate_meal_totals(matched_ingredients: list[dict]) -> dict:
     """
     Additionne les macros de tous les ingrédients détectés.
     Chaque entrée peut contenir quantity_grams (défaut 100 g).
     Les valeurs nutritionnelles dans la DB sont exprimées pour 100 g.
+    Les calories sont validées via la formule d'Atwater pour corriger
+    automatiquement les données de seed aberrantes.
     """
     totals = {
         "calories":   0.0,
@@ -111,11 +138,11 @@ def calculate_meal_totals(matched_ingredients: list[dict]) -> dict:
 
     for ingredient in matched_ingredients:
         ratio = float(ingredient.get("quantity_grams", 100)) / 100.0
-        totals["calories"]  += float(ingredient.get("calories_g") or 0) * ratio
-        totals["protein_g"] += float(ingredient.get("protein_g")  or 0) * ratio
-        totals["carbs_g"]   += float(ingredient.get("carbs_g")    or 0) * ratio
-        totals["fat_g"]     += float(ingredient.get("fat_g")      or 0) * ratio
-        totals["fiber_g"]   += float(ingredient.get("fiber_g")    or 0) * ratio
+        totals["calories"]  += _reliable_calories(ingredient) * ratio
+        totals["protein_g"] += float(ingredient.get("protein_g") or 0) * ratio
+        totals["carbs_g"]   += float(ingredient.get("carbs_g")   or 0) * ratio
+        totals["fat_g"]     += float(ingredient.get("fat_g")     or 0) * ratio
+        totals["fiber_g"]   += float(ingredient.get("fiber_g")   or 0) * ratio
 
     return {k: round(v, 1) for k, v in totals.items()}
 

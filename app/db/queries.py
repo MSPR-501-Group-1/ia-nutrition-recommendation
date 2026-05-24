@@ -7,16 +7,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
+    """
+    Cherche un ingrédient par nom (correspondance partielle).
+    Filtre les lignes avec des données nutritionnelles aberrantes :
+      - calories absentes, nulles ou > 900 kcal/100 g
+      - fat_g > 95 g/100 g (physiquement impossible)
+    Préfère la correspondance exacte.
+    """
     result = await db.execute(
         text("""
             SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
                    fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg,
-                   nutriscore, category, usda_name
+                   nutriscore, category, usda_name, price_per_kg
             FROM ingredient
             WHERE LOWER(name) LIKE LOWER(:pattern)
+              AND COALESCE(calories_g, 0) BETWEEN 10 AND 900
+              AND COALESCE(fat_g, 0) <= 95
+            ORDER BY
+                CASE WHEN LOWER(name) = LOWER(:exact) THEN 0 ELSE 1 END
             LIMIT 1
         """),
-        {"pattern": f"%{name}%"},
+        {"pattern": f"%{name}%", "exact": name},
     )
     row = result.mappings().first()
     return dict(row) if row else None
@@ -27,7 +38,7 @@ async def search_ingredients(db: AsyncSession, name: str, limit: int = 10) -> li
         text("""
             SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
                    fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg,
-                   nutriscore, category, usda_name
+                   nutriscore, category, usda_name, price_per_kg
             FROM ingredient
             WHERE LOWER(name) LIKE LOWER(:pattern)
             ORDER BY name

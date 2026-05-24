@@ -44,8 +44,7 @@ async def generate_meal_recommendation(
         return (
             f"Bilan du repas : {cal} kcal pour un objectif de {target} kcal/j "
             f"({goal}). "
-            "Recommandation IA indisponible (Ollama non démarré) — "
-            "installez et lancez Ollama avec `ollama serve` puis `ollama pull mistral`."
+            "Recommandation IA temporairement indisponible."
         )
 
 
@@ -66,16 +65,36 @@ async def generate_meal_plan(
     ingredient_names = [i["name"] for i in available_ingredients[:30]]
     ingredient_list  = ", ".join(ingredient_names)
 
+    # Construire les interdictions explicites selon le régime
+    forbidden_parts = []
+    diet_upper = (diet_type or "").upper()
+    if diet_upper in ("VEGETARIAN", "VEGAN"):
+        forbidden_parts.append("viande (bœuf, poulet, porc, agneau, veau, dinde, jambon, charcuterie)")
+        forbidden_parts.append("poisson et fruits de mer")
+    if diet_upper == "VEGAN":
+        forbidden_parts.append("produits laitiers (lait, fromage, beurre, crème, yaourt)")
+        forbidden_parts.append("œufs")
+        forbidden_parts.append("miel")
+    allergy_list = allergies if isinstance(allergies, list) else ([allergies] if allergies and allergies != "aucune" else [])
+    for allergen in allergy_list:
+        forbidden_parts.append(f"tout produit contenant {allergen}")
+    forbidden_str = " ; ".join(forbidden_parts) if forbidden_parts else "aucun"
+
     prompt = (
         f"Tu es un diététicien expert. Crée un plan de repas sur {days} jours "
         f"pour {first_name}, dont l'objectif est : {goal}.\n"
-        f"Régime alimentaire : {diet_type}. Allergies : {allergies}.\n"
+        f"Régime : {diet_type}. Allergies : {allergies}.\n"
+        f"INTERDIT (ne jamais utiliser ces aliments) : {forbidden_str}.\n"
         f"Utilise de préférence ces aliments disponibles : {ingredient_list}.\n\n"
         f"Pour chaque jour, fournis : petit-déjeuner, déjeuner, dîner et collation.\n"
         f"Réponds en JSON structuré avec les clés day_1 à day_{days}, "
         f"chaque jour ayant les clés breakfast, lunch, dinner, snack.\n"
-        f"Pour chaque repas, donne : name (nom du repas), ingredients (liste), "
-        f"estimated_calories (int)."
+        f"Pour chaque repas, donne les champs suivants :\n"
+        f"  - name (string) : nom du repas\n"
+        f"  - ingredients (array of strings) : liste des ingrédients principaux\n"
+        f"  - instructions (string) : étapes de préparation détaillées en 3-5 étapes numérotées\n"
+        f"  - estimated_calories (int) : estimation calorique\n"
+        f"Réponds uniquement avec le JSON, sans texte avant ni après, sans balises markdown."
     )
 
     try:
@@ -86,10 +105,19 @@ async def generate_meal_plan(
                     "model":  settings.ollama_model,
                     "prompt": prompt,
                     "stream": False,
+                    "options": {"num_ctx": min(2048 + days * 1024, 8192)},
                 },
-                timeout=180.0,
+                timeout=60.0 + days * 30.0,
             )
-            raw = response.json().get("response", "")
+            if response.status_code != 200:
+                body = response.text[:500]
+                print(f"[Ollama ERROR] HTTP {response.status_code}: {body}")
+                return {"error": f"Ollama HTTP {response.status_code}: {body}"}
+            resp_json = response.json()
+            if "error" in resp_json:
+                print(f"[Ollama ERROR] {resp_json['error']}")
+                return {"error": resp_json["error"]}
+            raw = resp_json.get("response", "")
 
         # Tentative de parse JSON — llama3.1 peut envelopper en ```json ... ```
         import json, re

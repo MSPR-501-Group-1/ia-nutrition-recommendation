@@ -21,27 +21,27 @@ from pydantic import BaseModel, Field
 
 class MacrosPerServing(BaseModel):
     """Valeurs nutritionnelles pour la quantité servie (pas pour 100g)."""
-    calories:   float
-    protein_g:  float
-    carbs_g:    float
-    fat_g:      float
-    fiber_g:    float
-    sugar_g:    Optional[float] = None   # absent pour certains ingrédients ETL
-    sodium_mg:  Optional[float] = None
+    calories:   float          = Field(examples=[118.0])
+    protein_g:  float          = Field(examples=[20.0])
+    carbs_g:    float          = Field(examples=[8.0])
+    fat_g:      float          = Field(examples=[0.4])
+    fiber_g:    float          = Field(examples=[0.0])
+    sugar_g:    Optional[float] = Field(default=None, examples=[6.0])
+    sodium_mg:  Optional[float] = Field(default=None, examples=[60.0])
 
 
 class RecipeIngredient(BaseModel):
-    ingredient_id:       str            # FK → PostgreSQL ingredient.ingredient_id
-    name:                str
-    category:            Literal[        # ingredient_category_enum
+    ingredient_id:       str             = Field(examples=["ING_0218"])
+    name:                str             = Field(examples=["Yaourt grec nature (0%)"])
+    category:            Literal[
         "VEGETABLE", "FRUIT", "MEAT", "DAIRY",
         "GRAIN", "BEVERAGE", "SNACK", "OTHER"
-    ]
-    nutriscore:          Optional[Literal["A", "B", "C", "D", "E"]] = None
-    quantity_g:          float          # quantité réelle servie (g)
-    unit:                Literal["g", "ml", "unit", "tbsp", "tsp"] = "g"
+    ]                                    = Field(examples=["DAIRY"])
+    nutriscore:          Optional[Literal["A", "B", "C", "D", "E"]] = Field(default=None, examples=["A"])
+    quantity_g:          float           = Field(examples=[200.0])
+    unit:                Literal["g", "ml", "unit", "tbsp", "tsp"] = Field(default="g", examples=["g"])
     macros_per_serving:  MacrosPerServing
-    estimated_cost_eur:  Optional[float] = None  # calculé côté backend (à implémenter)
+    estimated_cost_eur:  Optional[float] = Field(default=None, examples=[0.55])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -49,11 +49,11 @@ class RecipeIngredient(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class NutritionalSummary(BaseModel):
-    calories:  float
-    protein_g: float
-    carbs_g:   float
-    fat_g:     float
-    fiber_g:   float
+    calories:  float = Field(examples=[420.0])
+    protein_g: float = Field(examples=[38.0])
+    carbs_g:   float = Field(examples=[32.5])
+    fat_g:     float = Field(examples=[14.2])
+    fiber_g:   float = Field(examples=[4.8])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,22 +61,22 @@ class NutritionalSummary(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Recipe(BaseModel):
-    recipe_id:             str            # FK → PostgreSQL recipe.recipe_id
-    title:                 str
-    instructions:          str
+    recipe_id:             str  = Field(examples=["rec_poulet_legumes_001"])
+    title:                 str  = Field(examples=["Poulet grillé & légumes vapeur"])
+    instructions:          str  = Field(examples=["1. Assaisonner le poulet. 2. Griller 20 min à feu moyen. 3. Cuire les légumes 10 min à la vapeur."])
 
     # Champs optionnels : absents en DB, fournis par Ollama si disponibles
-    prep_time_min:         Optional[int]  = None
-    cook_time_min:         Optional[int]  = None
-    servings:              Optional[int]  = Field(default=1, ge=1)
+    prep_time_min:         Optional[int]  = Field(default=None, examples=[10])
+    cook_time_min:         Optional[int]  = Field(default=None, examples=[20])
+    servings:              Optional[int]  = Field(default=1, ge=1, examples=[1])
     image_url:             Optional[str]  = None
-    nutriscore:            Optional[Literal["A", "B", "C", "D", "E"]] = None
-    tags:                  Optional[list[str]] = None   # ex: ["gluten-free", "high-protein"]
+    nutriscore:            Optional[Literal["A", "B", "C", "D", "E"]] = Field(default=None, examples=["A"])
+    tags:                  Optional[list[str]] = Field(default=None, examples=[["high-protein", "gluten-free", "low-carb"]])
 
     ingredients:           list[RecipeIngredient]
     nutritional_summary:   NutritionalSummary
-    estimated_cost_eur:    Optional[float] = None
-    ai_notes:              Optional[list[str]] = None   # conseils Ollama
+    estimated_cost_eur:    Optional[float] = Field(default=None, examples=[3.20])
+    ai_notes:              Optional[list[str]] = Field(default=None, examples=[["Riche en protéines maigres, idéal pour la prise de masse."]])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,8 +84,8 @@ class Recipe(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Meal(BaseModel):
-    meal_type:      Literal["breakfast", "lunch", "dinner", "snack"]
-    time_suggested: Optional[str] = None  # format "HH:MM"
+    meal_type:      Literal["breakfast", "lunch", "dinner", "snack"] = Field(examples=["lunch"])
+    time_suggested: Optional[str] = Field(default=None, examples=["12:30"])
     recipe:         Recipe
 
 
@@ -94,11 +94,11 @@ class Meal(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DailyPlan(BaseModel):
-    day_number:           int             # 1 à N
-    date:                 Optional[str]   = None   # format ISO "YYYY-MM-DD"
-    total_calories:       float
+    day_number:           int            = Field(examples=[1])
+    date:                 Optional[str]  = Field(default=None, examples=["2026-05-23"])
+    total_calories:       float          = Field(examples=[1748.0])
     total_macros:         NutritionalSummary
-    estimated_cost_eur:   Optional[float] = None
+    estimated_cost_eur:   Optional[float] = Field(default=None, examples=[8.20])
     meals:                list[Meal]
 
 
@@ -107,22 +107,22 @@ class DailyPlan(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ShoppingItem(BaseModel):
-    ingredient_id:       str
-    name:                str
-    total_quantity_g:    float
-    unit:                str = "g"
-    estimated_cost_eur:  Optional[float] = None
+    ingredient_id:       str             = Field(examples=["ING_0042"])
+    name:                str             = Field(examples=["Poulet rôti"])
+    total_quantity_g:    float           = Field(examples=[600.0])
+    unit:                str             = Field(default="g", examples=["g"])
+    estimated_cost_eur:  Optional[float] = Field(default=None, examples=[4.80])
 
 
 class ShoppingCategory(BaseModel):
-    category: str
+    category: str = Field(examples=["VIANDES & POISSONS"])
     items:    list[ShoppingItem]
 
 
 class ShoppingList(BaseModel):
-    total_estimated_cost_eur: Optional[float] = None
-    currency:                 str = "EUR"
-    note:                     Optional[str] = None
+    total_estimated_cost_eur: Optional[float] = Field(default=None, examples=[57.40])
+    currency:                 str             = Field(default="EUR", examples=["EUR"])
+    note:                     Optional[str]   = Field(default=None, examples=["Liste pour 7 jours, 1 personne"])
     grouped_by_category:      list[ShoppingCategory]
 
 
@@ -131,19 +131,19 @@ class ShoppingList(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TargetMacros(BaseModel):
-    protein_g: float
-    carbs_g:   float
-    fat_g:     float
+    protein_g: float = Field(examples=[140.0])
+    carbs_g:   float = Field(examples=[160.0])
+    fat_g:     float = Field(examples=[55.0])
 
 
 class PlanMetadata(BaseModel):
-    duration_days:                int
-    target_calories_daily:        float
+    duration_days:                int              = Field(examples=[7])
+    target_calories_daily:        float            = Field(examples=[1750.0])
     target_macros:                TargetMacros
-    budget_constraint_eur:        Optional[float] = None
-    estimated_weekly_cost_eur:    Optional[float] = None
-    diet_type:                    Optional[str]   = None   # diet_type_enum
-    excluded_allergens:           Optional[list[str]] = None  # allergies_enum list
+    budget_constraint_eur:        Optional[float]  = Field(default=None, examples=[60.0])
+    estimated_weekly_cost_eur:    Optional[float]  = Field(default=None, examples=[57.40])
+    diet_type:                    Optional[str]    = Field(default=None, examples=["NONE"])
+    excluded_allergens:           Optional[list[str]] = Field(default=None, examples=[["GLUTEN"]])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -151,13 +151,13 @@ class PlanMetadata(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class UserContext(BaseModel):
-    user_id:    str
-    first_name: Optional[str]       = None
-    goal:       Optional[str]       = None   # health_goal_enum label
-    diet_type:  Optional[str]       = None
-    allergies:  Optional[list[str]] = None
-    height_cm:  Optional[float]     = None
-    weight_kg:  Optional[float]     = None
+    user_id:    str                   = Field(examples=["usr_mock_001"])
+    first_name: Optional[str]        = Field(default=None, examples=["Sophie"])
+    goal:       Optional[str]        = Field(default=None, examples=["fat_loss"])
+    diet_type:  Optional[str]        = Field(default=None, examples=["NONE"])
+    allergies:  Optional[list[str]]  = Field(default=None, examples=[["GLUTEN"]])
+    height_cm:  Optional[float]      = Field(default=None, examples=[167.0])
+    weight_kg:  Optional[float]      = Field(default=None, examples=[68.5])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,12 +165,12 @@ class UserContext(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class NutritionalInsights(BaseModel):
-    weekly_average_calories: Optional[float]       = None
-    weekly_average_macros:   Optional[NutritionalSummary] = None
-    balance_score:           Optional[float]       = Field(default=None, ge=0.0, le=1.0)
-    detected_deficits:       Optional[list[str]]   = None   # ex: ["fiber", "iron"]
-    detected_excesses:       Optional[list[str]]   = None   # ex: ["sodium"]
-    ai_global_recommendation: Optional[str]        = None   # texte Ollama
+    weekly_average_calories:  Optional[float]             = Field(default=None, examples=[1742.0])
+    weekly_average_macros:    Optional[NutritionalSummary] = None
+    balance_score:            Optional[float]             = Field(default=None, ge=0.0, le=1.0, examples=[0.87])
+    detected_deficits:        Optional[list[str]]         = Field(default=None, examples=[["fiber", "omega_3"]])
+    detected_excesses:        Optional[list[str]]         = Field(default=None, examples=[["sodium"]])
+    ai_global_recommendation: Optional[str]               = Field(default=None, examples=["Votre plan est globalement équilibré. Augmentez votre apport en fibres en ajoutant des légumineuses 2 fois par semaine."])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -195,11 +195,11 @@ class MealPlanResponse(BaseModel):
         nutritional_insights, budget_constraint_eur
     """
     # --- Méta-réponse ---
-    status:           str                      # "success" | "error"
-    request_id:       str                      # UUID trace
-    generated_at:     str                      # ISO 8601
-    ai_model:         Optional[str]  = None    # ex: "mistral:7b"
-    confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    status:           str             = Field(examples=["success"])
+    request_id:       str             = Field(examples=["a1b2c3d4-e5f6-7890-abcd-ef1234567890"])
+    generated_at:     str             = Field(examples=["2026-05-23T08:00:00Z"])
+    ai_model:         Optional[str]  = Field(default=None, examples=["mistral:7b"])
+    confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0, examples=[0.89])
 
     # --- Données ---
     user_context:          Optional[UserContext]         = None

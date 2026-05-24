@@ -17,18 +17,19 @@ router = APIRouter()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /analyze-food — Vision brute (debug / test partiel)
+# [HORS SUJET — commenté pour l'évaluation]
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/analyze-food", response_model=AnalyzeFoodResponse, tags=["Vision IA"])
-async def analyze_food(file: UploadFile = File(...)):
-    """
-    Retourne la liste brute des aliments détectés par HuggingFace, sans calcul de macros.
-    Pour le pipeline complet (vision + macros + recommandation), utiliser
-    POST /users/{user_id}/analyze-meal.
-    """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Le fichier doit être une image.")
-    return await run_analyze_food(await file.read(), file.filename)
+# @router.post("/analyze-food", response_model=AnalyzeFoodResponse, tags=["Vision IA"])
+# async def analyze_food(file: UploadFile = File(...)):
+#     """
+#     Retourne la liste brute des aliments détectés par HuggingFace, sans calcul de macros.
+#     Pour le pipeline complet (vision + macros + recommandation), utiliser
+#     POST /users/{user_id}/analyze-meal.
+#     """
+#     if not file.content_type or not file.content_type.startswith("image/"):
+#         raise HTTPException(status_code=400, detail="Le fichier doit être une image.")
+#     return await run_analyze_food(await file.read(), file.filename)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -49,13 +50,19 @@ async def analyze_food(file: UploadFile = File(...)):
     },
 )
 async def analyze_meal(
-    user_id:   str,
-    meal_type: Literal["breakfast", "lunch", "dinner", "snack"] = "lunch",
-    file:      UploadFile = File(...),
-    db:        AsyncSession = Depends(get_db),
+    user_id:             str,
+    meal_type:           Literal["breakfast", "lunch", "dinner", "snack"] = "lunch",
+    portion_grams:       int = 100,
+    with_recommendation: bool = True,
+    file:                UploadFile = File(...),
+    db:                  AsyncSession = Depends(get_db),
 ):
     """
     **Pipeline complet d'analyse d'un repas photographié.**
+
+    **Paramètres :**
+    - `portion_grams` : poids estimé de la portion en grammes (défaut : 100 g).
+      Appliqué à chaque aliment détecté. Exemple : 250 pour une assiette standard.
 
     **Étapes exécutées :**
     1. Validation de l'image et de l'utilisateur (PostgreSQL)
@@ -74,4 +81,8 @@ async def analyze_meal(
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Le fichier doit être une image.")
-    return await run_analyze_meal(user_id, meal_type, await file.read(), db)
+    if portion_grams < 1 or portion_grams > 5000:
+        raise HTTPException(status_code=400, detail="portion_grams doit être entre 1 et 5000 g.")
+    return await run_analyze_meal(
+        user_id, meal_type, await file.read(), db, portion_grams, with_recommendation
+    )

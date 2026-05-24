@@ -1,5 +1,6 @@
 # app/services/nlp/ollama_client.py
 import httpx
+from app.config import settings
 
 async def get_ollama_recommendation(user_data, meal_balance):
     """
@@ -16,10 +17,10 @@ async def get_ollama_recommendation(user_data, meal_balance):
         response = await client.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "mistral", # ou llama3
+                "model": settings.ollama_model,
                 "prompt": prompt,
-                "stream": False
+                "stream": False,
             },
-            timeout=30.0
+            timeout=90.0
         )
         return response.json().get("response")

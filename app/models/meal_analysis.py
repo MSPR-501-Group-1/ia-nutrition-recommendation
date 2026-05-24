@@ -20,16 +20,16 @@ from pydantic import BaseModel, Field
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DetectedLabel(BaseModel):
-    label:       str
-    description: Optional[str] = None
-    score:       float = Field(ge=0.0, le=1.0)
+    label:       str            = Field(examples=["poulet rôti"])
+    description: Optional[str] = Field(default=None, examples=["Morceaux de poulet grillé dorés"])
+    score:       float          = Field(ge=0.0, le=1.0, examples=[0.94])
 
 
 class VisionResult(BaseModel):
     """Résultat brut du modèle vision — utilisé aussi dans MealAnalysisDocument (MongoDB)."""
-    provider:                  str
+    provider:                  str   = Field(examples=["huggingface"])
     labels_detected:           list[DetectedLabel]
-    confidence_threshold_used: float
+    confidence_threshold_used: float = Field(examples=[0.40])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,29 +38,29 @@ class VisionResult(BaseModel):
 
 class IngredientMatch(BaseModel):
     """Ingrédient matché dans PostgreSQL — utilisé dans MealAnalysisDocument."""
-    ingredient_id:  str
-    name:           str
-    calories_g:     float
-    protein_g:      float
-    carbs_g:        float
-    fat_g:          float
-    fiber_g:        Optional[float] = None
-    detected_label: str
-    confidence:     float
-    quantity_grams: int = 100
+    ingredient_id:  str             = Field(examples=["ING_0042"])
+    name:           str             = Field(examples=["Poulet rôti"])
+    calories_g:     float           = Field(examples=[165.0])
+    protein_g:      float           = Field(examples=[31.0])
+    carbs_g:        float           = Field(examples=[0.0])
+    fat_g:          float           = Field(examples=[3.6])
+    fiber_g:        Optional[float] = Field(default=None, examples=[0.0])
+    detected_label: str             = Field(examples=["roasted chicken"])
+    confidence:     float           = Field(examples=[0.94])
+    quantity_grams: int             = Field(default=100, examples=[150])
 
 
 class MealTotals(BaseModel):
-    calories:  float
-    protein_g: float
-    carbs_g:   float
-    fat_g:     float
-    fiber_g:   float
+    calories:  float = Field(examples=[520.0])
+    protein_g: float = Field(examples=[38.5])
+    carbs_g:   float = Field(examples=[45.2])
+    fat_g:     float = Field(examples=[18.3])
+    fiber_g:   float = Field(examples=[6.1])
 
 
 class NutritionResult(BaseModel):
     ingredients_matched:   list[IngredientMatch]
-    ingredients_not_found: list[str]
+    ingredients_not_found: list[str] = Field(examples=[["tomates cerises"]])
     meal_totals:           MealTotals
 
 
@@ -87,7 +87,7 @@ class MealAnalysisDocument(BaseModel):
 class AnalyzeFoodResponse(BaseModel):
     """Réponse de POST /analyze-food — liste brute des aliments détectés."""
     status:         Literal["success"]
-    filename:       Optional[str] = None
+    filename:       Optional[str]       = Field(default=None, examples=["repas_midi.jpg"])
     ai_predictions: list[DetectedLabel]
 
 
@@ -100,11 +100,11 @@ class MacroBreakdown(BaseModel):
     Valeurs nutritionnelles pour la quantité réellement servie (pas pour 100g).
     Toutes les valeurs sont en grammes sauf `calories` (kcal).
     """
-    calories:  float
-    protein_g: float
-    carbs_g:   float
-    fat_g:     float
-    fiber_g:   float
+    calories:  float = Field(examples=[247.5])
+    protein_g: float = Field(examples=[46.5])
+    carbs_g:   float = Field(examples=[22.0])
+    fat_g:     float = Field(examples=[5.4])
+    fiber_g:   float = Field(examples=[3.2])
 
 
 class MatchedIngredientDetail(BaseModel):
@@ -112,26 +112,26 @@ class MatchedIngredientDetail(BaseModel):
     Ingrédient identifié par la vision IA ET matché dans PostgreSQL.
     Les macros sont déjà calculées pour la `quantity_grams` servie.
     """
-    ingredient_id:  str
-    name:           str
-    detected_label: str             # label brut retourné par HuggingFace
-    confidence:     float = Field(ge=0.0, le=1.0)
-    quantity_grams: int   = Field(default=100, ge=1)
-    macros:         MacroBreakdown  # macros pour quantity_grams (pas pour 100g)
+    ingredient_id:  str   = Field(examples=["ING_0042"])
+    name:           str   = Field(examples=["Poulet rôti"])
+    detected_label: str   = Field(examples=["roasted chicken"])
+    confidence:     float = Field(ge=0.0, le=1.0, examples=[0.94])
+    quantity_grams: int   = Field(default=100, ge=1, examples=[150])
+    macros:         MacroBreakdown
 
 
 class VisionSummary(BaseModel):
     """Résumé de l'étape vision — ce que l'IA a vu dans la photo."""
-    provider:                  str            # "huggingface"
+    provider:                  str   = Field(examples=["huggingface"])
     labels_detected:           list[DetectedLabel]
-    confidence_threshold_used: float
-    labels_count:              int
+    confidence_threshold_used: float = Field(examples=[0.40])
+    labels_count:              int   = Field(examples=[4])
 
 
 class NutritionSummary(BaseModel):
     """Résultat de l'étape nutrition — ce qui a été matché dans la DB."""
     ingredients_matched:   list[MatchedIngredientDetail]
-    ingredients_not_found: list[str]    # labels détectés mais absents de la DB
+    ingredients_not_found: list[str]     = Field(examples=[["tomates cerises"]])
     meal_totals:           MacroBreakdown
 
 
@@ -140,11 +140,11 @@ class DailyNeeds(BaseModel):
     Besoins journaliers estimés via Mifflin-St Jeor.
     `method` indique la formule et les hypothèses utilisées.
     """
-    calorie_target:   float
-    protein_target_g: float
-    carbs_target_g:   float
-    fat_target_g:     float
-    method:           str   # ex: "mifflin_fat_loss" | "mifflin_general" | "default_2000kcal"
+    calorie_target:   float = Field(examples=[1900.0])
+    protein_target_g: float = Field(examples=[142.5])
+    carbs_target_g:   float = Field(examples=[213.8])
+    fat_target_g:     float = Field(examples=[52.8])
+    method:           str   = Field(examples=["harris_benedict_fat_loss"])
 
 
 class MealBalance(BaseModel):
@@ -152,11 +152,11 @@ class MealBalance(BaseModel):
     Pourcentage de la cible journalière couvert par ce repas.
     `assessment` : "light" < 15% < "balanced" < 50% < "heavy"
     """
-    calories_pct: float
-    protein_pct:  float
-    carbs_pct:    float
-    fat_pct:      float
-    assessment:   Literal["light", "balanced", "heavy"]
+    calories_pct: float                                 = Field(examples=[27.4])
+    protein_pct:  float                                 = Field(examples=[33.2])
+    carbs_pct:    float                                 = Field(examples=[21.1])
+    fat_pct:      float                                 = Field(examples=[19.0])
+    assessment:   Literal["light", "balanced", "heavy"] = Field(examples=["balanced"])
 
 
 class AnalyzeMealResponse(BaseModel):
@@ -173,15 +173,18 @@ class AnalyzeMealResponse(BaseModel):
     Champs OPTIONNELS :
         recommendation (absent si Ollama indisponible)
     """
-    status:         str
-    analysis_id:    str                     # MongoDB ObjectId de la trace
-    analyzed_at:    str                     # ISO 8601
-    meal_type:      Literal["breakfast", "lunch", "dinner", "snack"]
+    status:         str  = Field(examples=["success"])
+    analysis_id:    str  = Field(examples=["6650aef3b1e4c2d8a3f7b091"])
+    analyzed_at:    str  = Field(examples=["2026-05-23T12:34:56Z"])
+    meal_type:      Literal["breakfast", "lunch", "dinner", "snack"] = Field(examples=["lunch"])
     vision:         VisionSummary
     nutrition:      NutritionSummary
     daily_needs:    DailyNeeds
     meal_balance:   MealBalance
-    recommendation: Optional[str] = None   # texte Ollama — absent si service indisponible
+    recommendation: Optional[str] = Field(
+        default=None,
+        examples=["Votre déjeuner est bien équilibré en protéines (33 % des besoins). Pensez à ajouter des légumes verts pour couvrir votre apport en fibres."],
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,19 +193,19 @@ class AnalyzeMealResponse(BaseModel):
 
 class DailyNeedsDetail(BaseModel):
     """Besoins nutritionnels journaliers calculés via Harris-Benedict révisé."""
-    bmr_kcal:         float   # Métabolisme de base (kcal)
-    tdee_kcal:        float   # Dépense énergétique totale (kcal)
-    calorie_target:   float   # Cible calorique ajustée selon l'objectif
-    protein_target_g: float
-    carbs_target_g:   float
-    fat_target_g:     float
-    goal:             str     # ex: "fat_loss" | "muscle_gain" | "maintenance"
+    bmr_kcal:         float = Field(examples=[1583.2])
+    tdee_kcal:        float = Field(examples=[1899.8])
+    calorie_target:   float = Field(examples=[1399.8])
+    protein_target_g: float = Field(examples=[131.2])
+    carbs_target_g:   float = Field(examples=[157.5])
+    fat_target_g:     float = Field(examples=[38.9])
+    goal:             str   = Field(examples=["fat_loss"])
 
 
 class DailyNeedsResponse(BaseModel):
     status:      Literal["success"]
-    user_id:     str
-    first_name:  Optional[str] = None
+    user_id:     str             = Field(examples=["usr_abc123"])
+    first_name:  Optional[str]  = Field(default=None, examples=["Sophie"])
     daily_needs: DailyNeedsDetail
 
 
@@ -212,21 +215,21 @@ class DailyNeedsResponse(BaseModel):
 
 class IngredientResult(BaseModel):
     """Un ingrédient retourné par la recherche plein-texte."""
-    ingredient_id: str
-    name:          str
-    category:      Optional[str] = None
-    nutriscore:    Optional[str] = None
-    calories_g:    float
-    protein_g:     float
-    carbs_g:       float
-    fat_g:         float
-    fiber_g:       float
+    ingredient_id: str             = Field(examples=["ING_0042"])
+    name:          str             = Field(examples=["Poulet rôti"])
+    category:      Optional[str]  = Field(default=None, examples=["MEAT"])
+    nutriscore:    Optional[str]  = Field(default=None, examples=["B"])
+    calories_g:    float           = Field(examples=[165.0])
+    protein_g:     float           = Field(examples=[31.0])
+    carbs_g:       float           = Field(examples=[0.0])
+    fat_g:         float           = Field(examples=[3.6])
+    fiber_g:       float           = Field(examples=[0.0])
 
 
 class IngredientSearchResponse(BaseModel):
     status:  Literal["success"]
-    query:   str
-    count:   int
+    query:   str              = Field(examples=["poulet"])
+    count:   int              = Field(examples=[3])
     results: list[IngredientResult]
 
 
@@ -236,15 +239,15 @@ class IngredientSearchResponse(BaseModel):
 
 class MealAnalysisSummary(BaseModel):
     """Vue compacte d'une analyse — utilisée dans le listing historique."""
-    analyzed_at:              str
-    meal_type:                str
-    calories:                 float
-    ingredients_matched:      int
-    recommendation_available: bool
+    analyzed_at:              str   = Field(examples=["2026-05-23T12:34:56Z"])
+    meal_type:                str   = Field(examples=["lunch"])
+    calories:                 float = Field(examples=[520.0])
+    ingredients_matched:      int   = Field(examples=[3])
+    recommendation_available: bool  = Field(examples=[True])
 
 
 class UserAnalysesResponse(BaseModel):
     status:   Literal["success"]
-    user_id:  str
-    count:    int
+    user_id:  str                      = Field(examples=["usr_abc123"])
+    count:    int                      = Field(examples=[5])
     analyses: list[MealAnalysisSummary]

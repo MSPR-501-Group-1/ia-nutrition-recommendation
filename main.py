@@ -25,8 +25,8 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(vision.router,     prefix="/api/v1", tags=["Vision IA"])
-app.include_router(nutrition.router,  prefix="/api/v1", tags=["Nutrition"])
+app.include_router(vision.router,     prefix="/api/v1")
+app.include_router(nutrition.router,  prefix="/api/v1")
 app.include_router(health.router,     prefix="/api/v1")
 
 

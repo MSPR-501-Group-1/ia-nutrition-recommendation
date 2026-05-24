@@ -21,6 +21,7 @@ from app.db import mongo, queries
 from app.services.nlp.nlp_orchestrator import generate_meal_recommendation
 from app.services.nutrition.calculator_service import (
     CONFIDENCE_THRESHOLD,
+    _reliable_calories,
     calculate_meal_totals,
     compute_meal_needs,
     compute_meal_balance,
@@ -45,10 +46,12 @@ async def run_analyze_food(image_bytes: bytes, filename: str | None) -> dict:
 
 
 async def run_analyze_meal(
-    user_id:     str,
-    meal_type:   Literal["breakfast", "lunch", "dinner", "snack"],
-    image_bytes: bytes,
-    db:          AsyncSession,
+    user_id:            str,
+    meal_type:          Literal["breakfast", "lunch", "dinner", "snack"],
+    image_bytes:        bytes,
+    db:                 AsyncSession,
+    portion_grams:      int = 100,
+    with_recommendation: bool = True,
 ) -> dict:
     """
     Pipeline complet : photo → identification → macros → recommandation IA.
@@ -85,7 +88,7 @@ async def run_analyze_meal(
         if ingredient:
             ingredient["detected_label"] = food_name
             ingredient["confidence"]     = float(lbl.get("score", 0))
-            ingredient["quantity_grams"] = 100   # quantité estimée par défaut
+            ingredient["quantity_grams"] = portion_grams
             matched_raw.append(ingredient)
         else:
             not_found.append(food_name)
@@ -97,10 +100,11 @@ async def run_analyze_meal(
 
     # ── 5. Recommandation Ollama (non bloquant) ───────────────────────────────
     recommendation: str | None = None
-    try:
-        recommendation = await generate_meal_recommendation(user, meal_totals, daily_needs)
-    except Exception:
-        pass  # L'analyse reste valide sans recommandation
+    if with_recommendation:
+        try:
+            recommendation = await generate_meal_recommendation(user, meal_totals, daily_needs)
+        except Exception:
+            pass  # L'analyse reste valide sans recommandation
 
     # ── 6. Persistance MongoDB ────────────────────────────────────────────────
     analyzed_at = datetime.now(timezone.utc).isoformat()
@@ -144,7 +148,7 @@ async def run_analyze_meal(
             "confidence":     ing["confidence"],
             "quantity_grams": ing["quantity_grams"],
             "macros": {
-                "calories":  round(float(ing["calories_g"]) * ing["quantity_grams"] / 100, 2),
+                "calories":  round(_reliable_calories(ing) * ing["quantity_grams"] / 100, 2),
                 "protein_g": round(float(ing["protein_g"])  * ing["quantity_grams"] / 100, 2),
                 "carbs_g":   round(float(ing["carbs_g"])    * ing["quantity_grams"] / 100, 2),
                 "fat_g":     round(float(ing["fat_g"])      * ing["quantity_grams"] / 100, 2),
