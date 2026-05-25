@@ -50,7 +50,7 @@ def _find_free_port(preferred: int) -> int:
 
 
 if __name__ == "__main__":
-    port = _find_free_port(8003)
-    if port != 8003:
-        print(f"[warn] port 8003 occupé, démarrage sur le port {port}")
+    port = _find_free_port(8002)
+    if port != 8002:
+        print(f"[warn] port 8002 occupé, démarrage sur le port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

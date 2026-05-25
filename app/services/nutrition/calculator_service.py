@@ -207,8 +207,8 @@ def compute_meal_needs(user: dict) -> dict:
       endurance     → 20 % prot / 55 % carbs / 25 % lipides
       general       → 25 % prot / 50 % carbs / 25 % lipides
     """
-    weight = float(user.get("weight") or 70)
-    height = float(user.get("height") or 170)
+    weight = float(user.get("current_weight_kg") or user.get("weight") or 70)
+    height = float(user.get("height_cm") or user.get("height") or 170)
     goal   = (user.get("goal_label") or "").lower()
 
     bmr  = (10 * weight) + (6.25 * height) - (5 * 30) - 161  # Mifflin femme, 30 ans

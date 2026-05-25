@@ -15,7 +15,7 @@ async def get_ollama_recommendation(user_data, meal_balance):
     
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:11434/api/generate",
+            f"{settings.ollama_base_url}/api/generate",
             json={
                 "model": settings.ollama_model,
                 "prompt": prompt,

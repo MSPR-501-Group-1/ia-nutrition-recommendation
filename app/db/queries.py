@@ -73,6 +73,34 @@ async def get_ingredients_for_meal_plan(
     return [dict(row) for row in result.mappings()]
 
 
+async def save_meal_to_postgres(
+    db: AsyncSession,
+    user_id: str,
+    calories: int,
+    meal_totals: dict,
+) -> None:
+    """
+    Trace légère d'un repas analysé dans la table `meal`.
+    Non bloquant — l'appelant avale l'exception si elle survient.
+    """
+    await db.execute(
+        text("""
+            INSERT INTO meal (user_id, calories, protein_g, carbs_g, fat_g, fiber_g, analyzed_at)
+            VALUES (:user_id, :calories, :protein_g, :carbs_g, :fat_g, :fiber_g, NOW())
+            ON CONFLICT DO NOTHING
+        """),
+        {
+            "user_id":   user_id,
+            "calories":  calories,
+            "protein_g": meal_totals.get("protein_g", 0),
+            "carbs_g":   meal_totals.get("carbs_g",   0),
+            "fat_g":     meal_totals.get("fat_g",     0),
+            "fiber_g":   meal_totals.get("fiber_g",   0),
+        },
+    )
+    await db.commit()
+
+
 async def get_user_profile(db: AsyncSession, user_id: str) -> dict | None:
     result = await db.execute(
         text("""
