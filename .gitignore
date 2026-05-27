@@ -47,6 +47,7 @@ Thumbs.db
 # ============================================================
 
 /note.md
+docker-compose.yml
 
 # ============================================================
 #  Données de seeding (fichiers volumineux, ne pas committer)
