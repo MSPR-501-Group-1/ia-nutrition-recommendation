@@ -73,6 +73,18 @@ async def get_ingredients_for_meal_plan(
     return [dict(row) for row in result.mappings()]
 
 
+async def get_user_budget(db: AsyncSession, user_id: str) -> float | None:
+    """Retourne budget_max_per_meal depuis user_preference, ou None si absent."""
+    result = await db.execute(
+        text("SELECT budget_max_per_meal FROM user_preference WHERE user_id = :user_id"),
+        {"user_id": user_id},
+    )
+    row = result.mappings().first()
+    if row and row["budget_max_per_meal"] is not None:
+        return float(row["budget_max_per_meal"])
+    return None
+
+
 async def save_meal_to_postgres(
     db: AsyncSession,
     user_id: str,

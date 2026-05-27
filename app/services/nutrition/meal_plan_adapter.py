@@ -13,6 +13,13 @@ from app.services.nutrition.calculator_service import (
     calculate_daily_needs,
     _reliable_calories,
 )
+from app.services.nutrition.pricing_service import (
+    compute_ingredient_cost,
+    guess_category_from_name,
+    get_price_per_kg,
+)
+
+DEFAULT_BUDGET_PER_MEAL = 5.0  # € par repas si aucune préférence en DB
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes internes
@@ -46,6 +53,7 @@ async def map_ollama_to_contract(
     days: int,
     request_id: str,
     db: AsyncSession,
+    budget_max_per_meal: float | None = None,
 ) -> dict:
     """
     Mappe la réponse brute d'Ollama vers le contrat MealPlanResponse.
@@ -93,7 +101,8 @@ async def map_ollama_to_contract(
                 db_ing = await get_ingredient_by_name(db, ing_name)
 
                 if db_ing:
-                    ratio = quantity_g / 100.0
+                    ratio    = quantity_g / 100.0
+                    category = db_ing.get("category") or "OTHER"
                     macros = {
                         "calories":  round(_reliable_calories(db_ing) * ratio, 2),
                         "protein_g": round(float(db_ing.get("protein_g") or 0) * ratio, 2),
@@ -101,44 +110,60 @@ async def map_ollama_to_contract(
                         "fat_g":     round(float(db_ing.get("fat_g")     or 0) * ratio, 2),
                         "fiber_g":   round(float(db_ing.get("fiber_g")   or 0) * ratio, 2),
                     }
-                    price_per_kg = float(db_ing.get("price_per_kg") or 0)  # None si colonne absente
-                    cost = price_per_kg * quantity_g / 1000.0 if price_per_kg > 0 else 0.0
+                    cost = compute_ingredient_cost(
+                        category, quantity_g, db_ing.get("price_per_kg")
+                    )
 
                     ing_entry = {
-                        "ingredient_id":    db_ing["ingredient_id"],
-                        "name":             db_ing["name"],
-                        "category":         db_ing.get("category") or "OTHER",
-                        "nutriscore":       db_ing.get("nutriscore"),
-                        "quantity_g":       quantity_g,
-                        "unit":             "g",
+                        "ingredient_id":      db_ing["ingredient_id"],
+                        "name":               db_ing["name"],
+                        "category":           category,
+                        "nutriscore":         db_ing.get("nutriscore"),
+                        "quantity_g":         quantity_g,
+                        "unit":               "g",
                         "macros_per_serving": macros,
-                        "estimated_cost_eur": round(cost, 3) if price_per_kg > 0 else None,
+                        "estimated_cost_eur": round(cost, 3),
                     }
 
                     # Agrégation shopping list
                     key = db_ing["ingredient_id"]
                     if key not in shopping_agg:
                         shopping_agg[key] = {
-                            "ingredient_id":    db_ing["ingredient_id"],
-                            "name":             db_ing["name"],
-                            "category":         db_ing.get("category") or "OTHER",
-                            "total_quantity_g":  0.0,
-                            "price_per_kg":      price_per_kg,
+                            "ingredient_id":   db_ing["ingredient_id"],
+                            "name":            db_ing["name"],
+                            "category":        category,
+                            "total_quantity_g": 0.0,
+                            "db_price":        db_ing.get("price_per_kg"),
                         }
                     shopping_agg[key]["total_quantity_g"] += quantity_g
 
                 else:
-                    # Ingrédient non trouvé en DB — macros à 0, pas de prix
-                    macros = EMPTY_MACROS.copy()
-                    cost = 0.0
+                    # Ingrédient non trouvé en DB — on devine la catégorie pour le prix
+                    category = guess_category_from_name(ing_name)
+                    macros   = EMPTY_MACROS.copy()
+                    cost     = compute_ingredient_cost(category, quantity_g)
+
                     ing_entry = {
-                        "ingredient_id":    f"ollama_{i}_{meal_type}_{j}",
-                        "name":             ing_name,
-                        "category":         "OTHER",
-                        "quantity_g":       quantity_g,
-                        "unit":             "g",
+                        "ingredient_id":      f"ollama_{i}_{meal_type}_{j}",
+                        "name":               ing_name,
+                        "category":           category,
+                        "quantity_g":         quantity_g,
+                        "unit":               "g",
                         "macros_per_serving": macros,
+                        "estimated_cost_eur": round(cost, 3),
                     }
+
+                    # Agrégation shopping list pour les ingrédients hors DB aussi
+                    key = ing_entry["ingredient_id"]
+                    if key not in shopping_agg:
+                        shopping_agg[key] = {
+                            "ingredient_id":   key,
+                            "name":            ing_name,
+                            "category":        category,
+                            "total_quantity_g": 0.0,
+                            "db_price":        None,
+                        }
+                    shopping_agg[key]["total_quantity_g"] += quantity_g
 
                 ingredients.append(ing_entry)
                 recipe_macros = _sum_macros(recipe_macros, macros)
@@ -181,14 +206,16 @@ async def map_ollama_to_contract(
     category_map: dict[str, list] = defaultdict(list)
     total_shopping_cost = 0.0
     for item in shopping_agg.values():
-        cost_item = item["price_per_kg"] * item["total_quantity_g"] / 1000.0
+        cost_item = compute_ingredient_cost(
+            item["category"], item["total_quantity_g"], item.get("db_price")
+        )
         total_shopping_cost += cost_item
         category_map[item["category"]].append({
-            "ingredient_id":    item["ingredient_id"],
-            "name":             item["name"],
-            "total_quantity_g": round(item["total_quantity_g"], 0),
-            "unit":             "g",
-            "estimated_cost_eur": round(cost_item, 2) if item["price_per_kg"] > 0 else None,
+            "ingredient_id":      item["ingredient_id"],
+            "name":               item["name"],
+            "total_quantity_g":   round(item["total_quantity_g"], 0),
+            "unit":               "g",
+            "estimated_cost_eur": round(cost_item, 2),
         })
 
     shopping_list = {
@@ -239,6 +266,10 @@ async def map_ollama_to_contract(
                 "carbs_g":   daily_needs["carbs_target_g"],
                 "fat_g":     daily_needs["fat_target_g"],
             },
+            "budget_constraint_eur":     round(
+                (budget_max_per_meal or DEFAULT_BUDGET_PER_MEAL) * days * 3, 2
+            ),
+            "estimated_weekly_cost_eur": round(total_shopping_cost, 2) if total_shopping_cost > 0 else None,
             "diet_type":          user.get("diet_type"),
             "excluded_allergens": excluded,
         },

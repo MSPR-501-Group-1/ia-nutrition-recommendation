@@ -5,7 +5,7 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -51,7 +51,7 @@ router = APIRouter()
 )
 async def analyze_meal(
     user_id:             str,
-    meal_type:           Literal["breakfast", "lunch", "dinner", "snack"] = "lunch",
+    meal_type:           Literal["breakfast", "lunch", "dinner", "snack"] = Form("lunch"),
     portion_grams:       int = 100,
     with_recommendation: bool = True,
     file:                UploadFile = File(...),

@@ -40,13 +40,18 @@ def _calculate_age(birth_date) -> int:
     return max(age, 1)
 
 
+def _normalize_height_cm(raw: float) -> float:
+    """Convertit la taille en cm si elle est stockée en mètres (< 10)."""
+    return raw * 100 if raw < 10 else raw
+
+
 def calculate_bmr(user: dict) -> float:
     """
     Calcule le métabolisme de base (BMR) avec Harris-Benedict révisé.
     gender_code : 1 = homme, 2 = femme (ou autre → formule femme par défaut).
     """
     weight = float(user.get("current_weight_kg") or 70)
-    height = float(user.get("height_cm") or 170)
+    height = _normalize_height_cm(float(user.get("height_cm") or 170))
     age    = _calculate_age(user.get("birth_date"))
     gender = int(user.get("gender_code") or 2)
 
@@ -208,7 +213,7 @@ def compute_meal_needs(user: dict) -> dict:
       general       → 25 % prot / 50 % carbs / 25 % lipides
     """
     weight = float(user.get("current_weight_kg") or user.get("weight") or 70)
-    height = float(user.get("height_cm") or user.get("height") or 170)
+    height = _normalize_height_cm(float(user.get("height_cm") or user.get("height") or 170))
     goal   = (user.get("goal_label") or "").lower()
 
     bmr  = (10 * weight) + (6.25 * height) - (5 * 30) - 161  # Mifflin femme, 30 ans

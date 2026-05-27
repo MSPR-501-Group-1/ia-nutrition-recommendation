@@ -6,6 +6,7 @@
 #   app/db/queries.py                            ← requêtes PostgreSQL
 #   app/db/mongo.py                              ← requêtes MongoDB
 
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -13,8 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import queries
-from app.db import mongo as db_mongo
+from app.db import queries, mongo as db_mongo
 from app.db.database import get_db
 from app.models.meal_plan import MealPlanResponse
 from app.models.meal_analysis import (
@@ -90,11 +90,11 @@ async def generate_meal_plan(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
-    safe_foods = await queries.get_ingredients_for_meal_plan(
-        db,
-        diet_type=user.get("diet_type"),
+    safe_foods, budget = await asyncio.gather(
+        queries.get_ingredients_for_meal_plan(db, diet_type=user.get("diet_type")),
+        queries.get_user_budget(db, user_id),
     )
-    raw_plan   = await nlp_generate_meal_plan(user, safe_foods, days)
+    raw_plan = await nlp_generate_meal_plan(user, safe_foods, days)
 
     if "error" in raw_plan:
         raise HTTPException(
@@ -102,7 +102,9 @@ async def generate_meal_plan(
             detail=f"Service IA indisponible : {raw_plan['error']}",
         )
 
-    return await map_ollama_to_contract(user, raw_plan, days, str(uuid.uuid4()), db)
+    return await map_ollama_to_contract(
+        user, raw_plan, days, str(uuid.uuid4()), db, budget_max_per_meal=budget
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
