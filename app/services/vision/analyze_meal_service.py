@@ -29,6 +29,57 @@ from app.services.nutrition.calculator_service import (
 from app.services.vision.huggingface_client import detect_food_with_hf
 
 
+# Portions typiques par catégorie DB (g par ingrédient dans un plat)
+# Basées sur les recommandations ANSES / portions culinaires françaises standard
+_CATEGORY_PORTIONS: dict[str, float] = {
+    "MEAT":      150.0,  # viande, poisson, œufs (portion protéine standard)
+    "DAIRY":      40.0,  # fromage, crème (accompagnement / garniture)
+    "VEGETABLE": 120.0,  # légumes cuits ou crus
+    "FRUIT":     100.0,  # fruit frais
+    "GRAIN":     180.0,  # riz, pâtes, pain (cuits)
+    "BEVERAGE":  200.0,  # boisson
+    "SNACK":      30.0,  # noix, snack
+    "OTHER":     100.0,  # défaut
+}
+
+# Mots-clés pour détecter garnitures/épices indépendamment de la catégorie DB
+_GARNISH_KW = {
+    "basil", "basilic", "parsley", "persil", "thyme", "thym", "oregano", "origan",
+    "mint", "menthe", "tarragon", "estragon", "chive", "ciboulette", "rosemary",
+    "romarin", "cilantro", "coriandre", "dill", "aneth", "sage", "sauge",
+    "chervil", "cerfeuil",
+}
+_SAUCE_KW = {
+    "sauce", "ketchup", "mayonnaise", "vinaigrette", "mustard", "moutarde",
+    "gravy", "coulis", "dressing", "oil", "huile", "beurre", "butter",
+}
+_SPICE_KW = {
+    "salt", "sel", "pepper", "poivre", "spice", "épice", "piment",
+    "ginger", "gingembre", "cumin", "paprika", "curry", "cinnamon", "cannelle",
+    "nutmeg", "muscade", "clove", "girofle", "anise", "anis",
+}
+
+
+def _estimate_portion(label: str, category: str | None) -> float:
+    """
+    Estime un poids réaliste pour un ingrédient détecté.
+
+    Priorité :
+      1. Garnitures / herbes → 10 g
+      2. Sauces / condiments → 60 g
+      3. Épices              → 5 g
+      4. Catégorie DB        → portion typique ANSES
+    """
+    lbl = label.lower()
+    if any(k in lbl for k in _GARNISH_KW):
+        return 10.0
+    if any(k in lbl for k in _SAUCE_KW):
+        return 60.0
+    if any(k in lbl for k in _SPICE_KW):
+        return 5.0
+    return _CATEGORY_PORTIONS.get((category or "OTHER").upper(), 100.0)
+
+
 async def run_analyze_food(image_bytes: bytes, filename: str | None) -> dict:
     """
     Vision brute : détecte les aliments sans calcul de macros.
@@ -48,7 +99,7 @@ async def run_analyze_food(image_bytes: bytes, filename: str | None) -> dict:
 async def run_analyze_meal(
     user_id:            str,
     meal_type:          Literal["breakfast", "lunch", "dinner", "snack"],
-    image_bytes:        bytes,
+    images:             list[bytes],
     db:                 AsyncSession,
     portion_grams:      int = 100,
     with_recommendation: bool = True,
@@ -67,11 +118,21 @@ async def run_analyze_meal(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
-    # ── 2. Vision IA ──────────────────────────────────────────────────────────
+    # ── 2. Vision IA — détection sur chaque photo, fusion des labels ─────────────
+    raw_labels: list[dict] = []
     try:
-        raw_labels: list[dict] = await detect_food_with_hf(image_bytes)
+        for img in images:
+            raw_labels += await detect_food_with_hf(img)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Service vision indisponible : {exc}")
+
+    # Dédoublonnage : si même label détecté sur plusieurs photos, on garde la confiance max
+    seen: dict[str, dict] = {}
+    for lbl in raw_labels:
+        key = lbl.get("label", "").lower()
+        if key not in seen or lbl.get("score", 0) > seen[key].get("score", 0):
+            seen[key] = lbl
+    raw_labels = list(seen.values())
 
     confident_labels = [
         lbl for lbl in raw_labels
@@ -88,7 +149,7 @@ async def run_analyze_meal(
         if ingredient:
             ingredient["detected_label"] = food_name
             ingredient["confidence"]     = float(lbl.get("score", 0))
-            ingredient["quantity_grams"] = portion_grams
+            ingredient["quantity_grams"] = _estimate_portion(food_name, ingredient.get("category"))
             matched_raw.append(ingredient)
         else:
             not_found.append(food_name)

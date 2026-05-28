@@ -41,8 +41,8 @@ def _calculate_age(birth_date) -> int:
 
 
 def _normalize_height_cm(raw: float) -> float:
-    """Convertit la taille en cm si elle est stockée en mètres (< 10)."""
-    return raw * 100 if raw < 10 else raw
+    """Convertit en cm si la valeur est en mètres (< 3 → ex: 1.65 → 165)."""
+    return raw * 100 if raw < 3 else raw
 
 
 def calculate_bmr(user: dict) -> float:

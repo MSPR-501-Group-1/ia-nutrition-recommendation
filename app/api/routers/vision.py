@@ -3,7 +3,7 @@
 # Toute la logique du pipeline est dans :
 #   app/services/vision/analyze_meal_service.py
 
-from typing import Literal
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,35 +54,42 @@ async def analyze_meal(
     meal_type:           Literal["breakfast", "lunch", "dinner", "snack"] = Form("lunch"),
     portion_grams:       int = 100,
     with_recommendation: bool = True,
-    file:                UploadFile = File(...),
+    file:                UploadFile | None = File(None),
+    files:               List[UploadFile] = File(default=[]),
     db:                  AsyncSession = Depends(get_db),
 ):
     """
     **Pipeline complet d'analyse d'un repas photographié.**
 
-    **Paramètres :**
-    - `portion_grams` : poids estimé de la portion en grammes (défaut : 100 g).
-      Appliqué à chaque aliment détecté. Exemple : 250 pour une assiette standard.
+    Accepte **1 ou plusieurs photos** (ex : plat principal + accompagnement).
+    Rétrocompatible : `file` (champ unique) et `files` (liste) sont tous les deux acceptés.
+    Les labels détectés sur toutes les photos sont fusionnés avant analyse.
 
     **Étapes exécutées :**
-    1. Validation de l'image et de l'utilisateur (PostgreSQL)
-    2. Détection des aliments via HuggingFace Kimi-K2.5 (vision multimodale)
-    3. Filtrage par seuil de confiance (≥ 0.40)
-    4. Matching de chaque aliment dans PostgreSQL → récupération des macros
-    5. Calcul des totaux du repas + besoins journaliers (Mifflin-St Jeor)
-    6. Génération d'une recommandation personnalisée via Ollama (non bloquant)
-    7. Persistance du document complet dans MongoDB (`meal_analyses`)
-    8. Trace légère dans PostgreSQL (`meal` table)
-
-    **Contrat de réponse :** `AnalyzeMealResponse` (voir `app/models/meal_analysis.py`)
-
-    `recommendation` peut être `null` si Ollama est indisponible — les autres
-    champs sont toujours présents.
+    1. Validation des images et de l'utilisateur (PostgreSQL)
+    2. Détection des aliments via HuggingFace sur chaque photo
+    3. Fusion des labels (dédoublonnage par label, confiance max conservée)
+    4. Matching dans PostgreSQL → macros
+    5. Calcul des totaux + besoins journaliers (Mifflin-St Jeor)
+    6. Recommandation personnalisée via Ollama (non bloquant)
+    7. Persistance MongoDB + trace PostgreSQL
     """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Le fichier doit être une image.")
+    # Fusion des deux paramètres pour rétrocompatibilité
+    all_files = list(files)
+    if file is not None:
+        all_files.append(file)
+
+    if not all_files:
+        raise HTTPException(status_code=400, detail="Au moins une image est requise.")
     if portion_grams < 1 or portion_grams > 5000:
         raise HTTPException(status_code=400, detail="portion_grams doit être entre 1 et 5000 g.")
+
+    images: list[bytes] = []
+    for f in all_files:
+        if not f.content_type or not f.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail=f"{f.filename} : le fichier doit être une image.")
+        images.append(await f.read())
+
     return await run_analyze_meal(
-        user_id, meal_type, await file.read(), db, portion_grams, with_recommendation
+        user_id, meal_type, images, db, portion_grams, with_recommendation
     )

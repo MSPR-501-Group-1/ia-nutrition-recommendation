@@ -238,15 +238,107 @@ _GROUP_MAP: list[tuple[str, str]] = [
 ]
 
 
-def _category(grp: str, ssgrp: str = "", ssssgrp: str = "") -> str:
+# ── Keyword sets pour les flags diététiques ────────────────────────────────────
+# frozenset = O(1) lookup vs O(n) pour une liste — plus efficace sur 2800 lignes
+#
+# Idéalement ces sets seraient la source unique utilisée aussi par _GROUP_MAP,
+# mais on garde _GROUP_MAP pour la catégorie (ordered, priorité) et ces sets
+# pour les flags (non ordonnés, lookup pur).
+
+_MEAT_KW: frozenset = frozenset({
+    "viande", "boeuf", "bœuf", "veau", "porc", "agneau", "mouton", "cheval",
+    "lapin", "canard", "oie", "dinde", "poulet", "volaille", "gibier",
+    "charcuterie", "jambon", "saucisse", "saucisson", "lardons", "bacon",
+    "merguez", "rillette", "pâté", "boudin", "andouille", "chorizo", "salami",
+    "abat", "foie", "tripes", "poisson", "saumon", "thon", "sardine",
+    "maquereau", "cabillaud", "truite", "colin", "sole", "daurade", "anchois",
+    "hareng", "crevette", "homard", "crabe", "langoustine", "moule", "huître",
+    "palourde", "calmar", "pieuvre", "coquillage", "crustacé", "mollusque",
+})
+
+_DAIRY_KW: frozenset = frozenset({
+    "lait", "fromage", "beurre", "crème", "yaourt", "yogourt", "kefir",
+    "faisselle", "ricotta", "mozzarella", "parmesan", "camembert", "brie",
+    "roquefort", "comté", "emmental", "gruyère", "lacté", "lactée",
+    "chèvre", "brebis", "laitier",
+})
+
+_EGG_KW: frozenset = frozenset({
+    "oeuf", "œuf", "oeufs", "œufs",
+})
+
+# Grains AVEC gluten
+_GLUTEN_KW: frozenset = frozenset({
+    "blé", "ble", "froment", "orge", "seigle", "épeautre", "epeautre",
+    "kamut", "gluten", "farine", "semoule", "couscous", "boulgour", "bulgur",
+    "pain", "pâte", "pates", "biscuit", "gâteau", "viennoiserie", "brioche",
+    "frik", "brick", "cracker", "galette de blé",
+})
+
+# Grains SANS gluten — exception à la règle GRAIN → gluten
+_GLUTEN_FREE_KW: frozenset = frozenset({
+    "riz", "maïs", "mais", "quinoa", "sarrasin", "millet", "sorgho",
+    "amarante", "teff", "fonio", "tapioca", "châtaigne",
+})
+
+
+def _compute_flags(name: str, category: str) -> tuple[bool, bool, bool, bool]:
     """
-    Cherche dans le groupe principal, le sous-groupe et le sous-sous-groupe.
-    Retourne la première catégorie trouvée, sinon 'OTHER'.
+    Calcule les 4 flags diététiques depuis le nom et la catégorie.
+
+    is_vegetarian : pas de viande/poisson (œufs et lait OK)
+    is_vegan      : pas de viande/poisson/lait/œufs
+    is_gluten_free: pas de céréales contenant du gluten
+    is_dairy_free : pas de produits laitiers
+
+    Logique gluten :
+      - GRAIN → False par défaut (conservateur)
+      - SAUF si le nom contient un grain naturellement sans gluten
+      - OU si le nom contient explicitement un mot-clé gluten → False
     """
+    n = name.lower()
+
+    has_meat  = category == "MEAT"  or any(k in n for k in _MEAT_KW)
+    has_dairy = category == "DAIRY" or any(k in n for k in _DAIRY_KW)
+    has_egg   = any(k in n for k in _EGG_KW)
+
+    # Gluten : GRAIN = False sauf si grain sans gluten connu dans le nom
+    if category == "GRAIN":
+        has_gluten = not any(k in n for k in _GLUTEN_FREE_KW)
+    else:
+        has_gluten = any(k in n for k in _GLUTEN_KW)
+
+    is_vegetarian  = not has_meat
+    is_vegan       = not has_meat and not has_dairy and not has_egg
+    is_gluten_free = not has_gluten
+    is_dairy_free  = not has_dairy
+
+    return is_vegetarian, is_vegan, is_gluten_free, is_dairy_free
+
+
+def _category(grp: str, ssgrp: str = "", ssssgrp: str = "", name: str = "") -> str:
+    """
+    Détermine la catégorie diététique d'un ingrédient.
+
+    Priorité 1 — nom de l'aliment (détecte les plats préparés mal classés par Ciqual)
+      ex : "Nouilles sautées aux crevettes" → catégorie Ciqual = GRAIN
+           mais "crevette" dans le nom → on force MEAT
+
+    Priorité 2 — groupe / sous-groupe Ciqual
+      ex : groupe "Viandes, charcuteries" → MEAT
+    """
+    # Priorité 1 : scan du nom de l'aliment
+    name_lower = name.lower()
+    for keyword, cat in _GROUP_MAP:
+        if keyword in name_lower:
+            return cat
+
+    # Priorité 2 : scan des groupes Ciqual
     combined = f"{grp} {ssgrp} {ssssgrp}".lower()
     for keyword, cat in _GROUP_MAP:
         if keyword in combined:
             return cat
+
     return "OTHER"
 
 
@@ -349,21 +441,25 @@ def build_rows(df: "pd.DataFrame") -> list[tuple]:
             skipped_no_cal += 1
             continue
 
+        cat   = _category(grp, ssgrp, ssssgrp, name)
+        flags = _compute_flags(name, cat)
+
         rows.append((
-            str(uuid.uuid4()),                  # ingredient_id
-            name[:255],                          # name
-            _category(grp, ssgrp, ssssgrp),                       # category (enum DB)
-            None,                                                  # nutriscore (absent de Ciqual)
-            _cap(cal, 999.9),                                      # calories_g  DECIMAL(4,1)
-            _cap(_parse(row.get(col_fat))   if col_fat   else None, 999.9),   # fat_g
-            _cap(_parse(row.get(col_fiber)) if col_fiber else None, 999.99),  # fiber_g
-            _cap(_parse(row.get(col_sugar)) if col_sugar else None, 999.99),  # sugar_g
-            _cap(_parse(row.get(col_sodium))if col_sodium else None, 999.99), # sodium_mg
-            _cap(_parse(row.get(col_chol)) if col_chol  else None, 999.99),  # cholesterol_mg
-            _cap(_parse(row.get(col_prot))  if col_prot  else None, 999.99),  # protein_g
-            _cap(_parse(row.get(col_carb))  if col_carb  else None, 999.99),  # carbs_g
-            None,                                                  # usda_name
-            None,                                                  # price_per_kg
+            str(uuid.uuid4()),                                                 # ingredient_id
+            name[:255],                                                        # name
+            cat,                                                               # category
+            None,                                                              # nutriscore
+            _cap(cal, 999.9),                                                  # calories_g
+            _cap(_parse(row.get(col_fat))    if col_fat    else None, 999.9),  # fat_g
+            _cap(_parse(row.get(col_fiber))  if col_fiber  else None, 999.99), # fiber_g
+            _cap(_parse(row.get(col_sugar))  if col_sugar  else None, 999.99), # sugar_g
+            _cap(_parse(row.get(col_sodium)) if col_sodium else None, 999.99), # sodium_mg
+            _cap(_parse(row.get(col_chol))   if col_chol   else None, 999.99), # cholesterol_mg
+            _cap(_parse(row.get(col_prot))   if col_prot   else None, 999.99), # protein_g
+            _cap(_parse(row.get(col_carb))   if col_carb   else None, 999.99), # carbs_g
+            None,                                                              # usda_name
+            None,                                                              # price_per_kg
+            *flags,                                                            # is_vegetarian, is_vegan, is_gluten_free, is_dairy_free
         ))
     print(f"  {len(rows)} ingrédients avec calories valides ({skipped_no_cal} ignorés sans calories).")
     return rows
@@ -373,9 +469,10 @@ INSERT_SQL = """
     INSERT INTO ingredient (
         ingredient_id, name, category, nutriscore,
         calories_g, fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg,
-        protein_g, carbs_g, usda_name, price_per_kg
+        protein_g, carbs_g, usda_name, price_per_kg,
+        is_vegetarian, is_vegan, is_gluten_free, is_dairy_free
     )
-    VALUES (%s,%s,%s,%s, %s,%s,%s,%s,%s,%s, %s,%s,%s,%s)
+    VALUES (%s,%s,%s,%s, %s,%s,%s,%s,%s,%s, %s,%s,%s,%s, %s,%s,%s,%s)
     ON CONFLICT DO NOTHING
 """
 
@@ -405,6 +502,10 @@ def main():
 
     cur = conn.cursor()
     try:
+        print("  Vidage de la table (TRUNCATE CASCADE)...")
+        cur.execute("TRUNCATE TABLE ingredient RESTART IDENTITY CASCADE")
+        conn.commit()
+
         cur.execute("SELECT COUNT(*) FROM ingredient")
         before = cur.fetchone()[0]
         print(f"  Ingrédients existants : {before}")

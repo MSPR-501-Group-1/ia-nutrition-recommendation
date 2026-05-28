@@ -21,8 +21,9 @@ async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
                    nutriscore, category, usda_name, price_per_kg
             FROM ingredient
             WHERE LOWER(name) LIKE LOWER(:pattern)
-              AND COALESCE(calories_g, 0) BETWEEN 10 AND 900
+              AND COALESCE(calories_g, 0) BETWEEN 1 AND 900
               AND COALESCE(fat_g, 0) <= 95
+              AND COALESCE(fiber_g, 0) <= 50
             ORDER BY
                 CASE WHEN LOWER(name) = LOWER(:exact) THEN 0 ELSE 1 END
             LIMIT 1
@@ -62,10 +63,11 @@ async def get_ingredients_for_meal_plan(
     """
     params: dict = {"limit": limit}
 
-    if diet_type in ("vegan", "vegetarian"):
-        base_query += " AND LOWER(category) NOT IN ('meat', 'fish', 'seafood')"
-    if diet_type == "vegan":
-        base_query += " AND LOWER(category) NOT IN ('dairy', 'eggs')"
+    if diet_type in ("VEGAN", "VEGETARIAN", "vegan", "vegetarian"):
+        base_query += " AND is_vegetarian = TRUE"
+
+    if diet_type in ("VEGAN", "vegan"):
+        base_query += " AND is_vegan = TRUE"
 
     base_query += " ORDER BY RANDOM() LIMIT :limit"
 
