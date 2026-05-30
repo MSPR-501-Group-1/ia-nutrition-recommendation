@@ -1,6 +1,8 @@
 ﻿# app/db/mongo.py
 # Connexion MongoDB async via Motor.
-# Stocke les documents d'analyse de repas produits par le pipeline IA.
+# Collections :
+#   meal_analyses — analyses de repas par photo (POST /analyze-meal)
+#   meal_plans    — plans repas générés par Ollama (POST /meal-plan)
 
 from decimal import Decimal
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -33,6 +35,7 @@ def get_collection(collection_name: str):
 
 
 meal_analyses = get_collection("meal_analyses")
+meal_plans    = get_collection("meal_plans")
 
 
 async def save_meal_analysis(document: dict) -> str:
@@ -41,6 +44,15 @@ async def save_meal_analysis(document: dict) -> str:
     Retourne l'ObjectId du document inséré sous forme de string.
     """
     result = await meal_analyses.insert_one(_bson_safe(document))
+    return str(result.inserted_id)
+
+
+async def save_meal_plan(document: dict) -> str:
+    """
+    Insère un plan repas dans la collection meal_plans.
+    Retourne l'ObjectId du document inséré sous forme de string.
+    """
+    result = await meal_plans.insert_one(_bson_safe(document))
     return str(result.inserted_id)
 
 

@@ -152,43 +152,6 @@ def calculate_meal_totals(matched_ingredients: list[dict]) -> dict:
     return {k: round(v, 1) for k, v in totals.items()}
 
 
-def calculate_meal_balance(meal_totals: dict, daily_needs: dict) -> dict:
-    """
-    Compare les macros du repas aux besoins journaliers.
-    Retourne les pourcentages couverts et le statut (ok / under / over).
-    """
-    def _status(pct: float) -> str:
-        if pct < 20:
-            return "under"
-        if pct > 50:
-            return "over"
-        return "ok"
-
-    calorie_pct = round(
-        meal_totals["calories"] / (daily_needs["calorie_target"] or 1) * 100, 1
-    )
-    protein_pct = round(
-        meal_totals["protein_g"] / (daily_needs["protein_target_g"] or 1) * 100, 1
-    )
-    carbs_pct = round(
-        meal_totals["carbs_g"] / (daily_needs["carbs_target_g"] or 1) * 100, 1
-    )
-    fat_pct = round(
-        meal_totals["fat_g"] / (daily_needs["fat_target_g"] or 1) * 100, 1
-    )
-
-    return {
-        "calories_pct":  calorie_pct,
-        "protein_pct":   protein_pct,
-        "carbs_pct":     carbs_pct,
-        "fat_pct":       fat_pct,
-        "calories_status":  _status(calorie_pct),
-        "protein_status":   _status(protein_pct),
-        "carbs_status":     _status(carbs_pct),
-        "fat_status":       _status(fat_pct),
-    }
-
-
 # ─────────────────────────────────────────────
 # PIPELINE D'ANALYSE DE REPAS (utilisé par generate.py)
 # ─────────────────────────────────────────────
@@ -215,8 +178,9 @@ def compute_meal_needs(user: dict) -> dict:
     weight = float(user.get("current_weight_kg") or user.get("weight") or 70)
     height = _normalize_height_cm(float(user.get("height_cm") or user.get("height") or 170))
     goal   = (user.get("goal_label") or "").lower()
+    age    = _calculate_age(user.get("birth_date"))
 
-    bmr  = (10 * weight) + (6.25 * height) - (5 * 30) - 161  # Mifflin femme, 30 ans
+    bmr  = (10 * weight) + (6.25 * height) - (5 * age) - 161  # Mifflin-St Jeor femme
     tdee = round(bmr * 1.375)
 
     if "fat_loss" in goal or "perte" in goal:
@@ -232,8 +196,9 @@ def compute_meal_needs(user: dict) -> dict:
         prot_pct, carb_pct, fat_pct = 0.20, 0.55, 0.25
         method = "mifflin_endurance"
     else:
-        method   = "mifflin_general" if user.get("weight") else "default_2000kcal"
-        calories = tdee if user.get("weight") else 2000
+        has_weight = user.get("current_weight_kg") or user.get("weight")
+        method     = "mifflin_general" if has_weight else "default_2000kcal"
+        calories   = tdee if has_weight else 2000
         prot_pct, carb_pct, fat_pct = 0.25, 0.50, 0.25
 
     return {

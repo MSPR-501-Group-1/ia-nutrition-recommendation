@@ -102,9 +102,18 @@ async def generate_meal_plan(
             detail=f"Service IA indisponible : {raw_plan['error']}",
         )
 
-    return await map_ollama_to_contract(
-        user, raw_plan, days, str(uuid.uuid4()), db, budget_max_per_meal=budget
+    request_id = str(uuid.uuid4())
+    plan = await map_ollama_to_contract(
+        user, raw_plan, days, request_id, db, budget_max_per_meal=budget
     )
+
+    # Persistance MongoDB — non bloquant
+    try:
+        await db_mongo.save_meal_plan(plan)
+    except Exception:
+        pass  # Le plan est retourné même si MongoDB est indisponible
+
+    return plan
 
 
 # ─────────────────────────────────────────────────────────────────────────────

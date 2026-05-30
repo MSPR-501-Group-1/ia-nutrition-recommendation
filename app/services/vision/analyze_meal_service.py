@@ -5,6 +5,7 @@
 #   1. Profil utilisateur (PostgreSQL)
 #   2. Détection des aliments via HuggingFace
 #   3. Filtering par seuil de confiance (≥ CONFIDENCE_THRESHOLD)
+#   3b. Déduplication sémantique : suppression des composants de plats composites
 #   4. Matching dans PostgreSQL → macros
 #   5. Calculs nutritionnels (Mifflin-St Jeor)
 #   6. Recommandation Ollama (non bloquant)
@@ -27,6 +28,7 @@ from app.services.nutrition.calculator_service import (
     compute_meal_balance,
 )
 from app.services.vision.huggingface_client import detect_food_with_hf
+
 
 
 # Portions typiques par catégorie DB (g par ingrédient dans un plat)
@@ -58,6 +60,36 @@ _SPICE_KW = {
     "ginger", "gingembre", "cumin", "paprika", "curry", "cinnamon", "cannelle",
     "nutmeg", "muscade", "clove", "girofle", "anise", "anis",
 }
+
+
+def _remove_sub_components(labels: list[dict]) -> list[dict]:
+    """
+    Supprime les labels qui sont des composants visuels d'un plat principal.
+
+    Logique : on trie par score décroissant. Pour chaque label candidat,
+    si son nom apparaît dans la description d'un label dominant déjà conservé,
+    c'est un composant du plat principal → on le supprime.
+
+    Exemple :
+      - "pizza" (0.99, description: "...with mozzarella cheese, tomato sauce...")
+      - "mozzarella cheese" (0.97) → "mozzarella cheese" est dans la description de pizza → supprimé
+      - "tomato sauce"      (0.96) → "tomato sauce" est dans la description de pizza → supprimé
+      - "basil"             (0.95) → "basil" est dans la description de pizza → supprimé
+
+    Cas sains préservés :
+      - "salmon" + "rice" + "broccoli" → aucun n'apparaît dans la description des autres → tous conservés
+    """
+    sorted_labels = sorted(labels, key=lambda x: float(x.get("score", 0)), reverse=True)
+    kept: list[dict] = []
+    for candidate in sorted_labels:
+        candidate_name = candidate.get("label", "").lower()
+        is_component = any(
+            candidate_name in (dominant.get("description") or "").lower()
+            for dominant in kept
+        )
+        if not is_component:
+            kept.append(candidate)
+    return kept
 
 
 def _estimate_portion(label: str, category: str | None) -> float:
@@ -103,6 +135,7 @@ async def run_analyze_meal(
     db:                 AsyncSession,
     portion_grams:      int = 100,
     with_recommendation: bool = True,
+    images_meta:        list[dict] | None = None,
 ) -> dict:
     """
     Pipeline complet : photo → identification → macros → recommandation IA.
@@ -139,6 +172,9 @@ async def run_analyze_meal(
         if float(lbl.get("score", 0)) >= CONFIDENCE_THRESHOLD
     ]
 
+    # ── 3b. Déduplication sémantique ─────────────────────────────────────────
+    confident_labels = _remove_sub_components(confident_labels)
+
     # ── 3. Matching PostgreSQL ────────────────────────────────────────────────
     matched_raw: list[dict] = []
     not_found:   list[str]  = []
@@ -174,6 +210,7 @@ async def run_analyze_meal(
             "user_id":    user_id,
             "meal_type":  meal_type,
             "analyzed_at": analyzed_at,
+            "image_metadata": images_meta or [],
             "vision_result": {
                 "provider":                  "huggingface",
                 "labels_detected":           raw_labels,

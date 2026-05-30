@@ -85,11 +85,19 @@ async def analyze_meal(
         raise HTTPException(status_code=400, detail="portion_grams doit être entre 1 et 5000 g.")
 
     images: list[bytes] = []
+    images_meta: list[dict] = []
     for f in all_files:
         if not f.content_type or not f.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail=f"{f.filename} : le fichier doit être une image.")
-        images.append(await f.read())
+        data = await f.read()
+        images.append(data)
+        images_meta.append({
+            "filename":     f.filename or "unknown",
+            "content_type": f.content_type,
+            "size_bytes":   len(data),
+        })
 
     return await run_analyze_meal(
-        user_id, meal_type, images, db, portion_grams, with_recommendation
+        user_id, meal_type, images, db, portion_grams, with_recommendation,
+        images_meta=images_meta,
     )

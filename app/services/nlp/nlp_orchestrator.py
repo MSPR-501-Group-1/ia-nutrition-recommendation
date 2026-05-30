@@ -63,7 +63,8 @@ async def generate_meal_plan(
     first_name  = user_profile.get("first_name", "")
 
     ingredient_names = [i["name"] for i in available_ingredients[:30]]
-    ingredient_list  = ", ".join(ingredient_names)
+    # Numérotation pour forcer Ollama à copier les noms exactement
+    ingredient_list = "\n".join(f"  {i+1}. {n}" for i, n in enumerate(ingredient_names))
 
     # Construire les interdictions explicites selon le régime
     forbidden_parts = []
@@ -82,19 +83,23 @@ async def generate_meal_plan(
 
     prompt = (
         f"Tu es un diététicien expert. Crée un plan de repas sur {days} jours "
-        f"pour {first_name}, dont l'objectif est : {goal}.\n"
-        f"Régime : {diet_type}. Allergies : {allergies}.\n"
-        f"INTERDIT (ne jamais utiliser ces aliments) : {forbidden_str}.\n"
-        f"Utilise de préférence ces aliments disponibles : {ingredient_list}.\n\n"
-        f"Pour chaque jour, fournis : petit-déjeuner, déjeuner, dîner et collation.\n"
-        f"Réponds en JSON structuré avec les clés day_1 à day_{days}, "
-        f"chaque jour ayant les clés breakfast, lunch, dinner, snack.\n"
-        f"Pour chaque repas, donne les champs suivants :\n"
+        f"pour {first_name}, objectif : {goal}, régime : {diet_type}.\n"
+        f"Allergies : {allergies}.\n"
+        f"INTERDIT : {forbidden_str}.\n\n"
+        f"RÈGLE CRITIQUE : tu dois utiliser UNIQUEMENT les ingrédients de la liste ci-dessous. "
+        f"Recopie leurs noms EXACTEMENT comme ils apparaissent, sans aucune modification "
+        f"(pas de majuscules, pluriel, abréviation ou traduction différente).\n\n"
+        f"LISTE DES INGRÉDIENTS DISPONIBLES :\n{ingredient_list}\n\n"
+        f"Crée un plan varié : chaque jour doit avoir des repas différents des autres jours. "
+        f"Ne répète pas le même ingrédient plus de 2 fois dans la semaine.\n\n"
+        f"Réponds en JSON avec les clés day_1 à day_{days}, "
+        f"chaque jour ayant breakfast, lunch, dinner, snack.\n"
+        f"Pour chaque repas :\n"
         f"  - name (string) : nom du repas\n"
-        f"  - ingredients (array of strings) : liste des ingrédients principaux\n"
-        f"  - instructions (string) : étapes de préparation détaillées en 3-5 étapes numérotées\n"
+        f"  - ingredients (array of strings) : noms EXACTS de la liste ci-dessus\n"
+        f"  - instructions (string) : 3-5 étapes numérotées\n"
         f"  - estimated_calories (int) : estimation calorique\n"
-        f"Réponds uniquement avec le JSON, sans texte avant ni après, sans balises markdown."
+        f"Réponds uniquement avec le JSON brut, sans markdown."
     )
 
     try:

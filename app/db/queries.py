@@ -5,30 +5,63 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Mots vides ignorés lors du fallback de matching par mot-clé
+_STOPWORDS = {
+    "de", "du", "des", "le", "la", "les", "un", "une", "au", "aux",
+    "et", "ou", "à", "a", "en", "par", "sur", "avec", "sans", "pour",
+    "cru", "crue", "cuit", "cuite", "cuits", "cuites", "frais", "fraîche",
+    "entier", "entière", "nature", "naturel", "naturelle",
+}
+
+_QUERY = """
+    SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
+           fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg,
+           nutriscore, category, usda_name, price_per_kg
+    FROM ingredient
+    WHERE (LOWER(name) LIKE LOWER(:pattern)
+        OR LOWER(COALESCE(usda_name, '')) LIKE LOWER(:pattern))
+    ORDER BY
+        CASE WHEN LOWER(name) = LOWER(:exact) THEN 0 ELSE 1 END,
+        LENGTH(name) ASC
+    LIMIT 1
+"""
+
+
+def _significant_keyword(name: str) -> str | None:
+    """
+    Extrait le premier mot significatif (≥ 4 lettres, hors stopwords).
+    Utilisé comme fallback si le match sur le nom complet échoue.
+    """
+    for word in name.replace(",", " ").replace("/", " ").split():
+        clean = word.strip("().-").lower()
+        if len(clean) >= 4 and clean not in _STOPWORDS:
+            return clean
+    return None
+
 
 async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
     """
-    Cherche un ingrédient par nom (correspondance partielle).
-    Filtre les lignes avec des données nutritionnelles aberrantes :
-      - calories absentes, nulles ou > 900 kcal/100 g
-      - fat_g > 95 g/100 g (physiquement impossible)
-    Préfère la correspondance exacte.
+    Cherche un ingrédient par nom.
+    1. Essai avec le nom complet (LIKE %name%)
+    2. Fallback : premier mot significatif (≥ 4 lettres) si rien trouvé
     """
+    # Tentative 1 : nom complet
     result = await db.execute(
-        text("""
-            SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
-                   fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg,
-                   nutriscore, category, usda_name, price_per_kg
-            FROM ingredient
-            WHERE LOWER(name) LIKE LOWER(:pattern)
-              AND COALESCE(calories_g, 0) BETWEEN 1 AND 900
-              AND COALESCE(fat_g, 0) <= 95
-              AND COALESCE(fiber_g, 0) <= 50
-            ORDER BY
-                CASE WHEN LOWER(name) = LOWER(:exact) THEN 0 ELSE 1 END
-            LIMIT 1
-        """),
+        text(_QUERY),
         {"pattern": f"%{name}%", "exact": name},
+    )
+    row = result.mappings().first()
+    if row:
+        return dict(row)
+
+    # Tentative 2 : fallback sur le premier mot significatif
+    keyword = _significant_keyword(name)
+    if not keyword:
+        return None
+
+    result = await db.execute(
+        text(_QUERY),
+        {"pattern": f"%{keyword}%", "exact": name},
     )
     row = result.mappings().first()
     return dict(row) if row else None
@@ -112,7 +145,7 @@ async def save_meal_to_postgres(
             "fiber_g":   meal_totals.get("fiber_g",   0),
         },
     )
-    await db.commit()
+    # Pas de commit ici — get_db() gère le commit/rollback en fin de requête
 
 
 async def get_user_profile(db: AsyncSession, user_id: str) -> dict | None:

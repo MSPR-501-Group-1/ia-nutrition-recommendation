@@ -43,13 +43,20 @@ DB = {
     "password": os.getenv("DB_PASSWORD", "secret"),
 }
 
-SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-BATCH_SIZE  = 200
+SCRIPT_DIR     = os.path.dirname(os.path.abspath(__file__))
+BATCH_SIZE     = 200
 
-# Accepte n'importe quel .csv / .xls / .xlsx dans le dossier scripts/
+# Fichier français — nommé ciqual.xls ou ciqual.xlsx
 CIQUAL_FILE = next(
     (os.path.join(SCRIPT_DIR, f) for f in os.listdir(SCRIPT_DIR)
-     if f.lower().endswith((".csv", ".xls", ".xlsx")) and f != "seed_ciqual.py"),
+     if f.lower() in ("ciqual.xls", "ciqual.xlsx")),
+    None,
+)
+
+# Fichier anglais — nommé ciqual_en.xls ou ciqual_en.xlsx (optionnel)
+CIQUAL_EN_FILE = next(
+    (os.path.join(SCRIPT_DIR, f) for f in os.listdir(SCRIPT_DIR)
+     if f.lower() in ("ciqual_en.xls", "ciqual_en.xlsx")),
     None,
 )
 
@@ -360,10 +367,10 @@ def _parse(val) -> float | None:
 
 
 def _cap(val: float | None, max_val: float) -> float | None:
-    """Plafonne la valeur aux limites de la colonne DB pour éviter l'overflow."""
+    """Retourne None si val dépasse max_val (donnée invalide), sinon val."""
     if val is None:
         return None
-    return min(val, max_val)
+    return val if val <= max_val else None
 
 
 # ── Détection automatique des colonnes ─────────────────────────────────────────
@@ -392,18 +399,52 @@ def _load_ciqual(path: str) -> "pd.DataFrame":
                  "Vérifiez que xlrd (pour .xls) ou openpyxl (pour .xlsx) est installé.")
 
 
-def build_rows(df: "pd.DataFrame") -> list[tuple]:
+def _load_english_names(path: str) -> dict[str, str]:
+    """
+    Charge le fichier Ciqual anglais et retourne {alim_code: english_name}.
+    Le code alim_code est la clé commune entre les deux fichiers.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        df = pd.read_excel(path, engine="xlrd" if ext == ".xls" else "openpyxl",
+                           header=0, dtype=str)
+    except Exception as e:
+        print(f"  Avertissement : impossible de lire {path} : {e}")
+        return {}
+
+    col_code = _find_col(df, "alim_code") or _find_col(df, "code")
+    col_name = _find_col(df, "alim_nom_eng") or _find_col(df, "nom_eng") or _find_col(df, "name")
+
+    if not col_code or not col_name:
+        print(f"  Avertissement : colonnes code/name introuvables dans {path}")
+        return {}
+
+    result = {}
+    for _, row in df.iterrows():
+        code = str(row.get(col_code, "")).strip()
+        name = str(row.get(col_name, "")).strip()
+        if code and name and name.lower() not in ("nan", ""):
+            result[code] = name[:200]
+
+    print(f"  {len(result)} noms anglais chargés depuis {os.path.basename(path)}")
+    return result
+
+
+def build_rows(df: "pd.DataFrame", en_names: dict[str, str] | None = None) -> list[tuple]:
+    col_code    = _find_col(df, "alim_code") or _find_col(df, "code")
     col_name    = _find_col(df, "alim_nom_fr") or _find_col(df, "nom_fr") or _find_col(df, "nom")
     col_grp     = _find_col(df, "alim_grp_nom_fr") or _find_col(df, "grp_nom") or _find_col(df, "groupe")
     col_ssgrp   = _find_col(df, "alim_ssgrp_nom_fr") or _find_col(df, "ssgrp_nom")
     col_ssssgrp = _find_col(df, "alim_ssssgrp_nom_fr") or _find_col(df, "ssssgrp_nom")
-    col_cal     = _find_col(df, "kcal") or _find_col(df, "energie", "jones")
-    col_prot    = _find_col(df, "protéine") or _find_col(df, "protein")
+    col_cal     = _find_col(df, "kcal", "1169") or _find_col(df, "kcal") or _find_col(df, "energie", "jones")
+    col_prot    = _find_col(df, "protéine", "g/100") or _find_col(df, "protein", "g/100")
     col_carb    = _find_col(df, "glucide") or _find_col(df, "carb")
     col_fat     = _find_col(df, "lipide") or _find_col(df, "fat")
-    col_fiber   = _find_col(df, "fibre") or _find_col(df, "fiber")
+    # "fibres alimentaires" pour éviter la colonne énergie "avec fibres (kJ)"
+    col_fiber   = _find_col(df, "fibres alimentaires") or _find_col(df, "fibre", "g/100") or _find_col(df, "fiber", "g/100")
     col_sugar   = _find_col(df, "sucre") or _find_col(df, "sugar")
-    col_sodium  = _find_col(df, "sodium")
+    # "sodium (mg" pour éviter "sel chlorure de sodium (g)"
+    col_sodium  = _find_col(df, "sodium", "mg") or _find_col(df, "sodium")
     col_chol    = _find_col(df, "cholest")
 
     if not col_name:
@@ -441,23 +482,25 @@ def build_rows(df: "pd.DataFrame") -> list[tuple]:
             skipped_no_cal += 1
             continue
 
-        cat   = _category(grp, ssgrp, ssssgrp, name)
-        flags = _compute_flags(name, cat)
+        cat      = _category(grp, ssgrp, ssssgrp, name)
+        flags    = _compute_flags(name, cat)
+        alim_code = str(row.get(col_code, "")).strip() if col_code else ""
+        en_name  = (en_names or {}).get(alim_code)
 
         rows.append((
             str(uuid.uuid4()),                                                 # ingredient_id
-            name[:255],                                                        # name
+            name[:255],                                                        # name (FR)
             cat,                                                               # category
             None,                                                              # nutriscore
             _cap(cal, 999.9),                                                  # calories_g
             _cap(_parse(row.get(col_fat))    if col_fat    else None, 999.9),  # fat_g
-            _cap(_parse(row.get(col_fiber))  if col_fiber  else None, 999.99), # fiber_g
+            _cap(_parse(row.get(col_fiber))  if col_fiber  else None, 80.0),   # fiber_g  (max réel: son de blé ~45g)
             _cap(_parse(row.get(col_sugar))  if col_sugar  else None, 999.99), # sugar_g
             _cap(_parse(row.get(col_sodium)) if col_sodium else None, 999.99), # sodium_mg
             _cap(_parse(row.get(col_chol))   if col_chol   else None, 999.99), # cholesterol_mg
             _cap(_parse(row.get(col_prot))   if col_prot   else None, 999.99), # protein_g
             _cap(_parse(row.get(col_carb))   if col_carb   else None, 999.99), # carbs_g
-            None,                                                              # usda_name
+            en_name,                                                           # usda_name → nom EN (HuggingFace)
             None,                                                              # price_per_kg
             *flags,                                                            # is_vegetarian, is_vegan, is_gluten_free, is_dairy_free
         ))
@@ -490,8 +533,15 @@ def main():
     df = _load_ciqual(CIQUAL_FILE)
     print(f"  {len(df)} lignes dans le fichier.")
 
-    print("Détection des colonnes ...")
-    rows = build_rows(df)
+    en_names: dict[str, str] = {}
+    if CIQUAL_EN_FILE:
+        print(f"Chargement des noms anglais depuis {CIQUAL_EN_FILE} ...")
+        en_names = _load_english_names(CIQUAL_EN_FILE)
+    else:
+        print("  Fichier ciqual_en.xls absent — usda_name sera NULL.")
+
+    print("Détection des colonnes et construction des lignes ...")
+    rows = build_rows(df, en_names)
 
     print(f"Connexion PostgreSQL → {DB['host']}:{DB['port']}/{DB['dbname']} ...")
     try:
