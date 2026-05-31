@@ -61,6 +61,40 @@ _SPICE_KW = {
     "nutmeg", "muscade", "clove", "girofle", "anise", "anis",
 }
 
+# Sous-ensemble des condiments à traiter comme matière grasse : une portion d'huile
+# ou de beurre (~1 c. à soupe) est bien plus petite qu'une portion de sauce.
+_OIL_KW = {"oil", "huile", "beurre", "butter"}
+
+# Mots-clés de rôle détectés dans la DESCRIPTION HuggingFace (fallback générique).
+# Utilisés quand le nom du label seul ne suffit pas à identifier le rôle.
+# Ex : "rosemary" inconnu → description "Fresh rosemary sprig used as garnish" → garnish
+_DESC_GARNISH_KW: frozenset = frozenset({
+    "garnish", "garnished", "garnishing", "sprig", "herb", "fresh herb", "decoration",
+})
+_DESC_OIL_KW: frozenset = frozenset({
+    "drizzle", "drizzled", "drizzling",
+})
+_DESC_SAUCE_KW: frozenset = frozenset({
+    "sauce", "dressing", "condiment",
+})
+_DESC_SPICE_KW: frozenset = frozenset({
+    "seasoning", "seasoned", "sprinkled", "sprinkling", "pinch",
+})
+
+# Montants FIXES (en grammes) des éléments secondaires.
+# Ils ne sont PAS mis à l'échelle : une pincée de sel ou un filet d'huile pèse
+# pareil quelle que soit la taille de l'assiette.
+_ROLE_FIXED_G: dict[str, float] = {
+    "garnish": 5.0,   # herbes / garniture fraîche      → un brin
+    "spice":   2.0,   # sel, poivre, épices sèches       → une pincée
+    "oil":     12.0,  # huile / beurre / matière grasse  → ~1 c. à soupe
+    "sauce":   30.0,  # sauce, condiment, dressing       → ~2 c. à soupe
+}
+
+# Bornes de sécurité appliquées à chaque quantité finale (g).
+_MIN_GRAMS = 1.0
+_MAX_GRAMS = 600.0
+
 
 def _remove_sub_components(labels: list[dict]) -> list[dict]:
     """
@@ -92,24 +126,125 @@ def _remove_sub_components(labels: list[dict]) -> list[dict]:
     return kept
 
 
-def _estimate_portion(label: str, category: str | None) -> float:
+def _clamp(grams: float) -> float:
+    """Borne une quantité dans [_MIN_GRAMS, _MAX_GRAMS]."""
+    return max(_MIN_GRAMS, min(_MAX_GRAMS, grams))
+
+
+def _clamp01(x: float) -> float:
+    """Ramène une valeur dans [0, 1] (sécurise un score de confiance)."""
+    return 0.0 if x < 0 else (1.0 if x > 1 else x)
+
+
+def _classify_role(label: str, description: str = "") -> str:
     """
-    Estime un poids réaliste pour un ingrédient détecté.
+    Classe un ingrédient détecté par son rôle dans l'assiette.
+
+    Priorité 1 — mots-clés dans le nom du label (précision maximale).
+    Priorité 2 — mots-clés de rôle dans la description HuggingFace (fallback générique).
+                 Permet de détecter "rosemary" comme garnish si la description dit
+                 "fresh rosemary sprig used as garnish", sans liste hardcodée.
+
+    Renvoie l'un de : "garnish" | "spice" | "oil" | "sauce" | "main".
+    """
+    lbl  = (label or "").lower()
+    desc = (description or "").lower()
+
+    # Priorité 1 : nom du label
+    if any(k in lbl for k in _GARNISH_KW):
+        return "garnish"
+    if any(k in lbl for k in _SAUCE_KW):
+        return "oil" if any(k in lbl for k in _OIL_KW) else "sauce"
+    if any(k in lbl for k in _SPICE_KW):
+        return "spice"
+
+    # Priorité 2 : description HuggingFace (fallback générique)
+    if any(k in desc for k in _DESC_GARNISH_KW):
+        return "garnish"
+    if any(k in desc for k in _DESC_OIL_KW):
+        return "oil"
+    if any(k in desc for k in _DESC_SAUCE_KW):
+        return "sauce"
+    if any(k in desc for k in _DESC_SPICE_KW):
+        return "spice"
+
+    return "main"
+
+
+def _estimate_portion(label: str, category: str | None = None) -> float:
+    """
+    Estimation absolue du poids d'un seul ingrédient (g).
 
     Priorité :
-      1. Garnitures / herbes → 10 g
-      2. Sauces / condiments → 60 g
-      3. Épices              → 5 g
-      4. Catégorie DB        → portion typique ANSES
+      1. Condiment (herbe / épice / huile / sauce) → montant fixe (_ROLE_FIXED_G)
+      2. Sinon, portion typique de la catégorie DB  → _CATEGORY_PORTIONS
     """
-    lbl = label.lower()
-    if any(k in lbl for k in _GARNISH_KW):
-        return 10.0
-    if any(k in lbl for k in _SAUCE_KW):
-        return 60.0
-    if any(k in lbl for k in _SPICE_KW):
-        return 5.0
+    role = _classify_role(label)
+    if role in _ROLE_FIXED_G:
+        return _ROLE_FIXED_G[role]
     return _CATEGORY_PORTIONS.get((category or "OTHER").upper(), 100.0)
+
+
+def _allocate_portions(matched: list[dict], portion_grams: int | None) -> None:
+    """
+    Attribue à chaque ingrédient un quantity_grams réaliste, en place.
+
+    Deux modes selon portion_grams :
+      - None (auto)  → priors ANSES absolus modulés par la confiance, pas de cible globale.
+                       Robuste quand la taille du repas est inconnue.
+      - int  (budget) → budget bidirectionnel : (portion_grams − condiments fixes) distribué
+                        aux ingrédients principaux au prorata (catégorie × confiance).
+                        Fonctionne dans les deux sens : 300 g comme 800 g donnent des
+                        assiettes différentes et cohérentes. Les condiments restent fixes.
+    """
+    if not matched:
+        return
+
+    mains:   list[dict]  = []
+    weights: list[float] = []
+    fixed_total = 0.0
+
+    # ── Étape 1 : condiments fixes + poids proportionnels des principaux ──────
+    for ing in matched:
+        label = ing.get("detected_label") or ing.get("name", "")
+        role  = _classify_role(label, ing.get("hf_description", ""))
+        if role in _ROLE_FIXED_G:
+            ing["quantity_grams"] = _ROLE_FIXED_G[role]
+            fixed_total += ing["quantity_grams"]
+        else:
+            cat  = (ing.get("category") or "OTHER").upper()
+            base = _CATEGORY_PORTIONS.get(cat, 100.0)
+            conf = _clamp01(float(ing.get("confidence", 0.0)))
+            # Poids proportionnel : 0.75·base (conf=0) … 1.25·base (conf=1)
+            mains.append(ing)
+            weights.append(base * (0.75 + 0.5 * conf))
+
+    if not mains:
+        for ing in matched:
+            ing["quantity_grams"] = _clamp(ing["quantity_grams"])
+        return
+
+    total_weight = sum(weights)
+
+    if portion_grams is None:
+        # ── Mode AUTO : priors absolus, pas de cible globale ─────────────────
+        for ing, w in zip(mains, weights):
+            ing["quantity_grams"] = round(w, 1)
+    else:
+        # ── Mode BUDGET : répartition bidirectionnelle ────────────────────────
+        budget = float(portion_grams) - fixed_total
+        budget = max(budget, _MIN_GRAMS * len(mains))  # garantie minimum
+        if total_weight > 0:
+            for ing, w in zip(mains, weights):
+                ing["quantity_grams"] = round(budget * w / total_weight, 1)
+        else:
+            per_item = round(budget / len(mains), 1)
+            for ing in mains:
+                ing["quantity_grams"] = per_item
+
+    # ── Étape 2 : bornes de sécurité finales ─────────────────────────────────
+    for ing in matched:
+        ing["quantity_grams"] = _clamp(ing["quantity_grams"])
 
 
 async def run_analyze_food(image_bytes: bytes, filename: str | None) -> dict:
@@ -133,7 +268,7 @@ async def run_analyze_meal(
     meal_type:          Literal["breakfast", "lunch", "dinner", "snack"],
     images:             list[bytes],
     db:                 AsyncSession,
-    portion_grams:      int = 100,
+    portion_grams:      int | None = None,
     with_recommendation: bool = True,
     images_meta:        list[dict] | None = None,
 ) -> dict:
@@ -183,12 +318,16 @@ async def run_analyze_meal(
         food_name  = lbl.get("label", "")
         ingredient = await queries.get_ingredient_by_name(db, food_name)
         if ingredient:
-            ingredient["detected_label"] = food_name
-            ingredient["confidence"]     = float(lbl.get("score", 0))
-            ingredient["quantity_grams"] = _estimate_portion(food_name, ingredient.get("category"))
+            ingredient["detected_label"]  = food_name
+            ingredient["confidence"]      = float(lbl.get("score", 0))
+            ingredient["hf_description"]  = lbl.get("description", "")
             matched_raw.append(ingredient)
         else:
             not_found.append(food_name)
+
+    # Attribution réaliste des quantités : portions absolues par rôle/catégorie,
+    # modulées par la confiance, avec portion_grams comme plafond.
+    _allocate_portions(matched_raw, portion_grams)
 
     # ── 4. Calculs nutritionnels ──────────────────────────────────────────────
     meal_totals  = calculate_meal_totals(matched_raw)

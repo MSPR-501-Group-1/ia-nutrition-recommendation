@@ -180,7 +180,8 @@ def compute_meal_needs(user: dict) -> dict:
     goal   = (user.get("goal_label") or "").lower()
     age    = _calculate_age(user.get("birth_date"))
 
-    bmr  = (10 * weight) + (6.25 * height) - (5 * age) - 161  # Mifflin-St Jeor femme
+    gender_offset = 5 if user.get("gender_code") == 0 else -161  # 0=homme, sinon femme par défaut
+    bmr  = (10 * weight) + (6.25 * height) - (5 * age) + gender_offset
     tdee = round(bmr * 1.375)
 
     if "fat_loss" in goal or "perte" in goal:

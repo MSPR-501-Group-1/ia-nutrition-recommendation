@@ -52,7 +52,7 @@ router = APIRouter()
 async def analyze_meal(
     user_id:             str,
     meal_type:           Literal["breakfast", "lunch", "dinner", "snack"] = Form("lunch"),
-    portion_grams:       int = 100,
+    portion_grams:       int | None = None,
     with_recommendation: bool = True,
     file:                UploadFile | None = File(None),
     files:               List[UploadFile] = File(default=[]),
@@ -81,8 +81,8 @@ async def analyze_meal(
 
     if not all_files:
         raise HTTPException(status_code=400, detail="Au moins une image est requise.")
-    if portion_grams < 1 or portion_grams > 5000:
-        raise HTTPException(status_code=400, detail="portion_grams doit être entre 1 et 5000 g.")
+    if portion_grams is not None and (portion_grams < 50 or portion_grams > 5000):
+        raise HTTPException(status_code=400, detail="portion_grams doit être entre 50 et 5000 g.")
 
     images: list[bytes] = []
     images_meta: list[dict] = []

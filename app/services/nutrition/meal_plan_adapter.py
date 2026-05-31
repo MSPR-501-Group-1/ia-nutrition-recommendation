@@ -234,14 +234,44 @@ async def map_ollama_to_contract(
     macro_sum = EMPTY_MACROS.copy()
     for d in daily_plans:
         macro_sum = _sum_macros(macro_sum, d["total_macros"])
-    avg_macros = _avg_macros(macro_sum, n)
-    target_cal = daily_needs["calorie_target"]
+    avg_macros   = _avg_macros(macro_sum, n)
+    target_cal   = daily_needs["calorie_target"]
+    target_prot  = daily_needs["protein_target_g"]
+    target_carbs = daily_needs["carbs_target_g"]
+    target_fat   = daily_needs["fat_target_g"]
     balance_score = round(min(avg_cal / target_cal, 1.0), 2) if target_cal > 0 else None
 
+    # Déficits et excès — seuil ±10 % de la cible journalière
+    _LABELS = {"calories": "calories", "protein": "protéines", "carbs": "glucides", "fat": "lipides"}
+
+    def _ratio(actual, target):
+        return actual / target if target else 1.0
+
+    ratios = {
+        "calories": _ratio(avg_cal,                         target_cal),
+        "protein":  _ratio(avg_macros.get("protein_g", 0), target_prot),
+        "carbs":    _ratio(avg_macros.get("carbs_g",   0), target_carbs),
+        "fat":      _ratio(avg_macros.get("fat_g",     0), target_fat),
+    }
+
+    detected_deficits = [_LABELS[k] for k, r in ratios.items() if r < 0.90] or None
+    detected_excesses = [_LABELS[k] for k, r in ratios.items() if r > 1.10] or None
+
+    reco_parts = []
+    if detected_deficits:
+        reco_parts.append(f"Déficits détectés : {', '.join(detected_deficits)}.")
+    if detected_excesses:
+        reco_parts.append(f"Excès détectés : {', '.join(detected_excesses)}.")
+    if not reco_parts:
+        reco_parts.append("Votre plan est bien équilibré sur l'ensemble de la période.")
+
     nutritional_insights = {
-        "weekly_average_calories": avg_cal,
-        "weekly_average_macros":   avg_macros,
-        "balance_score":           balance_score,
+        "weekly_average_calories":  avg_cal,
+        "weekly_average_macros":    avg_macros,
+        "balance_score":            balance_score,
+        "detected_deficits":        detected_deficits,
+        "detected_excesses":        detected_excesses,
+        "ai_global_recommendation": " ".join(reco_parts),
     }
 
     return {

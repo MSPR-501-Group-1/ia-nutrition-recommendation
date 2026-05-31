@@ -47,7 +47,7 @@ class IngredientMatch(BaseModel):
     fiber_g:        Optional[float] = Field(default=None, examples=[0.0])
     detected_label: str             = Field(examples=["roasted chicken"])
     confidence:     float           = Field(examples=[0.94])
-    quantity_grams: int             = Field(default=100, examples=[150])
+    quantity_grams: float           = Field(default=100.0, examples=[150.0])
 
 
 class MealTotals(BaseModel):
@@ -116,7 +116,7 @@ class MatchedIngredientDetail(BaseModel):
     name:           str   = Field(examples=["Poulet rôti"])
     detected_label: str   = Field(examples=["roasted chicken"])
     confidence:     float = Field(ge=0.0, le=1.0, examples=[0.94])
-    quantity_grams: int   = Field(default=100, ge=1, examples=[150])
+    quantity_grams: float = Field(default=100.0, ge=1.0, examples=[150.0])
     macros:         MacroBreakdown
 
 

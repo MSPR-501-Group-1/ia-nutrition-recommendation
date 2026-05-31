@@ -22,3 +22,5 @@ aiofiles
 # --- Tests ---
 pytest
 pytest-asyncio
+pytest-cov
+httpx
