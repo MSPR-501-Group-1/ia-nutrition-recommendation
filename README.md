@@ -82,27 +82,3 @@ Copier `.env.example` en `.env` et renseigner :
 | `OLLAMA_MODEL` | Modèle Ollama utilisé (défaut : `qwen2.5:14b`) |
 | `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | PostgreSQL |
 | `MONGO_URI` / `MONGO_DB_NAME` | MongoDB |
-
-
-
-1. Télécharge le fichier Ciqual
-Sur ciqual.anses.fr → "Télécharger la table Ciqual" → version Excel FR 2020. Renomme le fichier en ciqual.xls et place-le dans scripts/.
-
-2. Installe les dépendances (une seule fois)
-
-
-pip install pandas openpyxl xlrd psycopg2-binary
-3. Lance le script avec les variables de connexion à ta DB
-
-
-DB_HOST=localhost DB_PORT=5432 DB_NAME=ton_db DB_USER=postgres DB_PASSWORD=tonmdp python scripts/seed_ciqual.py
-Ce que fait le script :
-
-Détecte automatiquement les colonnes Ciqual (gère .xls et .xlsx)
-Mappe les groupes français → catégories DB (MEAT, VEGETABLE, DAIRY…)
-Parse les valeurs spéciales Ciqual : "-" → NULL, "traces" → 0.001, "<0.05" → 0.025
-Vérifie les noms existants avant d'insérer (pas de doublons)
-N'insère que les lignes avec des calories valides
-Résultat attendu : ~2800 aliments avec vrais noms français en plus des ~X entrées USDA existantes. Ensuite le meal-plan d'Ollama aura des vrais ingrédients ("Poulet rôti", "Brocoli cuit", "Riz basmati") au lieu des "CAMPBELL'S" et "BURGER KING".
-
-Tu veux qu'on rebuilde le Docker après avoir ajouté le fix de la taille, et qu'on relance le meal-plan 3 jours pour voir la différence avant d'ajouter Ciqual ?

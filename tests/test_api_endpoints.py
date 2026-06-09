@@ -10,7 +10,7 @@ Couvre :
 """
 import io
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
 
 
@@ -19,11 +19,6 @@ from main import app
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _fake_jpeg(content: bytes = b"FAKE_IMAGE_DATA") -> tuple:
-    """Retourne un tuple (nom, flux, content-type) pour un upload multipart."""
-    return ("file", (("photo.jpg", io.BytesIO(content), "image/jpeg"),))
-
 
 def _mock_user(user_id: str = "USR_001") -> dict:
     return {
@@ -100,7 +95,7 @@ class TestAnalyzeMealEndpoint:
         """
         with (
             patch("app.db.queries.get_user_profile",      new_callable=AsyncMock) as mock_user,
-            patch("app.services.vision.huggingface_client.detect_food_with_hf",
+            patch("app.services.vision.analyze_meal_service.detect_food_with_hf",
                   new_callable=AsyncMock) as mock_hf,
             patch("app.db.queries.get_ingredient_by_name", new_callable=AsyncMock) as mock_ing,
             patch("app.db.mongo.save_meal_analysis",        new_callable=AsyncMock) as mock_mongo,
@@ -146,7 +141,7 @@ class TestAnalyzeMealEndpoint:
         """HuggingFace inaccessible → 502."""
         with (
             patch("app.db.queries.get_user_profile", new_callable=AsyncMock) as mock_user,
-            patch("app.services.vision.huggingface_client.detect_food_with_hf",
+            patch("app.services.vision.analyze_meal_service.detect_food_with_hf",
                   new_callable=AsyncMock) as mock_hf,
         ):
             mock_user.return_value = _mock_user()
@@ -177,7 +172,7 @@ class TestMealPlanEndpoint:
             patch("app.db.queries.get_user_profile",             new_callable=AsyncMock) as mock_user,
             patch("app.db.queries.get_ingredients_for_meal_plan", new_callable=AsyncMock) as mock_ings,
             patch("app.db.queries.get_user_budget",              new_callable=AsyncMock) as mock_budget,
-            patch("app.services.nlp.nlp_orchestrator.generate_meal_plan",
+            patch("app.api.routers.nutrition.nlp_generate_meal_plan",
                   new_callable=AsyncMock) as mock_plan,
         ):
             mock_user.return_value   = _mock_user()
@@ -205,7 +200,7 @@ class TestMealPlanEndpoint:
             patch("app.db.queries.get_user_profile",             new_callable=AsyncMock) as mock_user,
             patch("app.db.queries.get_ingredients_for_meal_plan", new_callable=AsyncMock) as mock_ings,
             patch("app.db.queries.get_user_budget",              new_callable=AsyncMock) as mock_budget,
-            patch("app.services.nlp.nlp_orchestrator.generate_meal_plan",
+            patch("app.api.routers.nutrition.nlp_generate_meal_plan",
                   new_callable=AsyncMock) as mock_plan,
             patch("app.db.queries.get_ingredient_by_name",       new_callable=AsyncMock) as mock_ing,
         ):

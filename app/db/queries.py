@@ -98,6 +98,36 @@ async def search_ingredients(db: AsyncSession, query_str: str, limit: int = 10) 
     ]
 
 
+async def get_ingredients_for_meal_plan(
+    db: AsyncSession,
+    diet_type: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    base_query = """
+        SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
+               fat_g, fiber_g, nutriscore, category
+        FROM ingredient
+        WHERE category NOT IN ('SNACK', 'OTHER')
+          AND calories_g IS NOT NULL
+          AND protein_g IS NOT NULL
+    """
+    params: dict = {"limit": limit}
+    base_query += " ORDER BY RANDOM() LIMIT :limit"
+    result = await db.execute(text(base_query), params)
+    return [dict(row) for row in result.mappings()]
+
+
+async def get_user_budget(db: AsyncSession, user_id: str) -> float | None:
+    result = await db.execute(
+        text("SELECT budget_max_per_meal FROM user_preference WHERE user_id = :user_id"),
+        {"user_id": user_id},
+    )
+    row = result.mappings().first()
+    if row and row["budget_max_per_meal"] is not None:
+        return float(row["budget_max_per_meal"])
+    return None
+
+
 async def get_foods_filtered_by_constraints(db: AsyncSession, user_profile: dict, limit: int = 30) -> list[dict]:
     """
     Récupère une liste d'ingrédients sûrs pour la génération NLP (Ollama).
