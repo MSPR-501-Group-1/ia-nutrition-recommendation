@@ -107,7 +107,8 @@ async def get_ingredients_for_meal_plan(
         SELECT ingredient_id, name, calories_g, protein_g, carbs_g,
                fat_g, fiber_g, nutriscore, category
         FROM ingredient
-        WHERE category NOT IN ('SNACK', 'OTHER')
+        WHERE name != usda_name
+          AND category NOT IN ('SNACK', 'OTHER')
           AND calories_g IS NOT NULL
           AND protein_g IS NOT NULL
     """
