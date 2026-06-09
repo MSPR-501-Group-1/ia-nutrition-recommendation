@@ -47,6 +47,7 @@ async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
                calories_g, protein_g, carbs_g, fat_g, fiber_g
         FROM ingredient
         WHERE name ILIKE :search OR usda_name ILIKE :search
+        ORDER BY CASE WHEN name != usda_name THEN 0 ELSE 1 END
         LIMIT 1
     """)
 
