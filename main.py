@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routers import vision, nutrition
 from app.api import health
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(
     title="HealthAI Coach - Nutrition IA API",
@@ -29,6 +30,7 @@ app.include_router(vision.router,     prefix="/api/v1")
 app.include_router(nutrition.router,  prefix="/api/v1")
 app.include_router(health.router,     prefix="/api/v1")
 
+Instrumentator().instrument(app).expose(app) 
 
 @app.get("/", tags=["Root"])
 async def root():
