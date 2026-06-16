@@ -43,7 +43,7 @@ async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
     Utilisé par vision_orchestrator et la route /analyze-meal.
     """
     query = text("""
-        SELECT ingredient_id, name, category, nutriscore,
+        SELECT ingredient_id, name, usda_name, category, nutriscore,
                calories_g, protein_g, carbs_g, fat_g, fiber_g
         FROM ingredient
         WHERE name ILIKE :search OR usda_name ILIKE :search
@@ -58,6 +58,37 @@ async def get_ingredient_by_name(db: AsyncSession, name: str) -> dict | None:
         return {
             "ingredient_id": row.ingredient_id,
             "name":          row.name,
+            "usda_name":     row.usda_name,
+            "category":      str(row.category)   if row.category   else "OTHER",
+            "nutriscore":    str(row.nutriscore)  if row.nutriscore else None,
+            "calories_g":    float(row.calories_g) if row.calories_g else 0.0,
+            "protein_g":     float(row.protein_g)  if row.protein_g  else 0.0,
+            "carbs_g":       float(row.carbs_g)    if row.carbs_g    else 0.0,
+            "fat_g":         float(row.fat_g)      if row.fat_g      else 0.0,
+            "fiber_g":       float(row.fiber_g)    if row.fiber_g    else 0.0,
+        }
+    return None
+
+
+async def get_french_ingredient_by_category(db: AsyncSession, category: str, target_calories: float) -> dict | None:
+    """Retourne l'ingrédient français (name != usda_name) le plus proche en calories dans la catégorie."""
+    result = await db.execute(
+        text("""
+            SELECT ingredient_id, name, usda_name, category, nutriscore,
+                   calories_g, protein_g, carbs_g, fat_g, fiber_g
+            FROM ingredient
+            WHERE category = :cat AND name != usda_name
+              AND calories_g IS NOT NULL
+            ORDER BY ABS(calories_g - :cal) LIMIT 1
+        """),
+        {"cat": category, "cal": target_calories},
+    )
+    row = result.fetchone()
+    if row:
+        return {
+            "ingredient_id": row.ingredient_id,
+            "name":          row.name,
+            "usda_name":     row.usda_name,
             "category":      str(row.category)   if row.category   else "OTHER",
             "nutriscore":    str(row.nutriscore)  if row.nutriscore else None,
             "calories_g":    float(row.calories_g) if row.calories_g else 0.0,

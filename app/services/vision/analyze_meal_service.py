@@ -44,7 +44,15 @@ _CATEGORY_PORTIONS: dict[str, float] = {
     "OTHER":     100.0,  # défaut
 }
 
-# Mots-clés pour détecter garnitures/épices indépendamment de la catégorie DB
+# PlAT ENTIER
+_COMPOSITE_DISH_KW = {
+    "pizza", "pasta", "burger", "sandwich", "soup", "salad", "stew",
+    "curry", "risotto", "lasagna", "lasagne", "quiche", "omelette",
+    "paella", "sushi", "wrap", "taco", "bowl", "casserole",
+    "bolognese", "carbonara", "ravioli", "gnocchi",
+}
+
+# MOT CLES GARNITURE
 _GARNISH_KW = {
     "basil", "basilic", "parsley", "persil", "thyme", "thym", "oregano", "origan",
     "mint", "menthe", "tarragon", "estragon", "chive", "ciboulette", "rosemary",
@@ -148,6 +156,11 @@ def _classify_role(label: str, description: str = "") -> str:
     Renvoie l'un de : "garnish" | "spice" | "oil" | "sauce" | "main".
     """
     lbl  = (label or "").lower()
+
+    # Plat complet → toujours "main", peu importe la description
+    if any(k in lbl for k in _COMPOSITE_DISH_KW):
+        return "main"
+
     desc = (description or "").lower()
 
     # Priorité 1 : nom du label
@@ -177,11 +190,15 @@ def _estimate_portion(label: str, category: str | None = None) -> float:
 
     Priorité :
       1. Condiment (herbe / épice / huile / sauce) → montant fixe (_ROLE_FIXED_G)
-      2. Sinon, portion typique de la catégorie DB  → _CATEGORY_PORTIONS
+      2. Plat composite (pizza, pasta, burger…)     → 300 g (portion repas complète)
+      3. Sinon, portion typique de la catégorie DB  → _CATEGORY_PORTIONS
     """
     role = _classify_role(label)
     if role in _ROLE_FIXED_G:
         return _ROLE_FIXED_G[role]
+    lbl = (label or "").lower()
+    if any(k in lbl for k in _COMPOSITE_DISH_KW):
+        return 300.0
     return _CATEGORY_PORTIONS.get((category or "OTHER").upper(), 100.0)
 
 
@@ -213,7 +230,11 @@ def _allocate_portions(matched: list[dict], portion_grams: int | None) -> None:
             fixed_total += ing["quantity_grams"]
         else:
             cat  = (ing.get("category") or "OTHER").upper()
-            base = _CATEGORY_PORTIONS.get(cat, 100.0)
+            lbl  = (label or "").lower()
+            if any(k in lbl for k in _COMPOSITE_DISH_KW):
+                base = 300.0
+            else:
+                base = _CATEGORY_PORTIONS.get(cat, 100.0)
             conf = _clamp01(float(ing.get("confidence", 0.0)))
             # Poids proportionnel : 0.75·base (conf=0) … 1.25·base (conf=1)
             mains.append(ing)

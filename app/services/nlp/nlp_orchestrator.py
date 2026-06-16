@@ -62,7 +62,7 @@ async def generate_meal_plan(
     allergies   = user_profile.get("allergies") or "aucune"
     first_name  = user_profile.get("first_name", "")
 
-    ingredient_names = [i["name"] for i in available_ingredients[:20]]
+    ingredient_names = [i["name"] for i in available_ingredients[:50]]
     # Numérotation pour forcer Ollama à copier les noms exactement
     ingredient_list = "\n".join(f"  {i+1}. {n}" for i, n in enumerate(ingredient_names))
 
@@ -112,7 +112,7 @@ async def generate_meal_plan(
                     "stream": False,
                     "options": {"num_ctx": min(4096 + days * 2048, 16384)},
                 },
-                timeout=60.0 + days * 30.0,
+                timeout=200.0 + days * 90.0,
             )
             if response.status_code != 200:
                 body = response.text[:500]
