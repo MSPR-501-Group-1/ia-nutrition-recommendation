@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.queries import get_ingredient_by_name
+from app.db.queries import get_ingredient_by_name, get_french_ingredient_by_category
 from app.services.nutrition.calculator_service import (
     calculate_daily_needs,
     _reliable_calories,
@@ -99,6 +99,14 @@ async def map_ollama_to_contract(
                 )
 
                 db_ing = await get_ingredient_by_name(db, ing_name)
+
+                # Si le nom retourné est anglais (pas d'accent français), chercher l'équivalent français
+                _FRENCH_CHARS = frozenset("éèêëàâùûüôîïœçÉÈÊËÀÂÙÛÜÔÎÏŒÇ")
+                if db_ing and not any(c in _FRENCH_CHARS for c in db_ing["name"]):
+                    target_cal = float(db_ing.get("calories_g") or 0)
+                    french = await get_french_ingredient_by_category(db, db_ing.get("category") or "OTHER", target_cal)
+                    if french:
+                        db_ing = french
 
                 if db_ing:
                     ratio    = quantity_g / 100.0
@@ -241,7 +249,7 @@ async def map_ollama_to_contract(
     target_fat   = daily_needs["fat_target_g"]
     balance_score = round(min(avg_cal / target_cal, 1.0), 2) if target_cal > 0 else None
 
-    # Déficits et excès — seuil ±10 % de la cible journalière
+    # Déficits et excès — seuil +-10 % de la cible journalière
     _LABELS = {"calories": "calories", "protein": "protéines", "carbs": "glucides", "fat": "lipides"}
 
     def _ratio(actual, target):
