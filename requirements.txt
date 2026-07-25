@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 python-multipart
+prometheus-fastapi-instrumentator
 
 # --- Configuration & Variables d'environnement ---
 pydantic-settings

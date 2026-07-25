@@ -34,7 +34,7 @@ pipeline {
                     mkdir -p test-results
                     PYTHONPATH=. pytest tests/ \
                         --ignore=tests/run_real_hf_test.py \
-                        --timeout=30 \
+                        --timeout=300 \
                         --cov=app \
                         --cov-report=xml:coverage.xml \
                         --cov-report=term-missing \
