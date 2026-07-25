@@ -202,7 +202,7 @@ class TestMealPlanEndpoint:
             patch("app.db.queries.get_user_budget",              new_callable=AsyncMock) as mock_budget,
             patch("app.api.routers.nutrition.nlp_generate_meal_plan",
                   new_callable=AsyncMock) as mock_plan,
-            patch("app.db.queries.get_ingredient_by_name",       new_callable=AsyncMock) as mock_ing,
+            patch("app.services.nutrition.meal_plan_adapter.get_ingredient_by_name", new_callable=AsyncMock) as mock_ing,
         ):
             mock_user.return_value   = _mock_user()
             mock_ings.return_value   = [_mock_ingredient()]
