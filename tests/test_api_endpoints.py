@@ -203,12 +203,14 @@ class TestMealPlanEndpoint:
             patch("app.api.routers.nutrition.nlp_generate_meal_plan",
                   new_callable=AsyncMock) as mock_plan,
             patch("app.services.nutrition.meal_plan_adapter.get_ingredient_by_name", new_callable=AsyncMock) as mock_ing,
+            patch("app.services.nutrition.meal_plan_adapter.get_french_ingredient_by_category", new_callable=AsyncMock) as mock_fr_ing,
         ):
             mock_user.return_value   = _mock_user()
             mock_ings.return_value   = [_mock_ingredient()]
             mock_budget.return_value = 5.0
             mock_plan.return_value   = raw_plan_ollama
             mock_ing.return_value    = _mock_ingredient()
+            mock_fr_ing.return_value = _mock_ingredient()
 
             resp = await client.post("/api/v1/users/USR_001/meal-plan?days=1")
 
