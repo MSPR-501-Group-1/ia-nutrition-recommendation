@@ -52,6 +52,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
+                    withEnv(["SONAR_SCANNER_OPTS=-Xmx512m"]) {
                     script {
                         def scannerHome = tool 'SonarQube Scanner'
                         sh """
@@ -64,6 +65,7 @@ pipeline {
                                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                                 -Dsonar.python.version=${PYTHON_VERSION}
                         """
+                    }
                     }
                 }
             }
