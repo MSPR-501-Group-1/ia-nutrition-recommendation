@@ -22,7 +22,7 @@ pipeline {
                     . .venv/bin/activate
                     pip install --upgrade pip
                     pip install -r requirements.txt
-                    pip install pytest pytest-cov
+                    pip install pytest pytest-cov pytest-timeout
                 '''
             }
         }
@@ -33,7 +33,9 @@ pipeline {
                     . .venv/bin/activate
                     mkdir -p test-results
                     PYTHONPATH=. pytest tests/ \
-                        --cov=. \
+                        --ignore=tests/run_real_hf_test.py \
+                        --timeout=30 \
+                        --cov=app \
                         --cov-report=xml:coverage.xml \
                         --cov-report=term-missing \
                         --junitxml=test-results/results.xml \
